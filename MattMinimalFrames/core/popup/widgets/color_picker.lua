@@ -253,11 +253,13 @@ function MMF_CreateMinimalColorPicker(parent, config)
                 config.onColorChanged(ClampChannel(nr, r), ClampChannel(ng, g), ClampChannel(nb, b))
             end
             ApplySwatchColor(nr, ng, nb)
+            RefreshResetVisibility()
         end, function(cr, cg, cb)
             if config and config.onColorChanged then
                 config.onColorChanged(ClampChannel(cr, r), ClampChannel(cg, g), ClampChannel(cb, b))
             end
             ApplySwatchColor(cr, cg, cb)
+            RefreshResetVisibility()
         end)
     end)
 

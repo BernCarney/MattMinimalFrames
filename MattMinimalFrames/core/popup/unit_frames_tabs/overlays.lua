@@ -182,7 +182,7 @@ function MMF_BuildUnitFramesOverlaysSection(ctx)
             buttonOffset = 102,
             buttonWidth = RIGHT_COL_WIDTH - 102,
             label = "Overlay Color",
-            resetLabel = "Reset",
+            resetLabel = "RESET",
             getColor = function()
                 return ClampColorChannel(MattMinimalFramesDB and MattMinimalFramesDB.healPredictionColorR, 0.0),
                     ClampColorChannel(MattMinimalFramesDB and MattMinimalFramesDB.healPredictionColorG, 0.827),
@@ -201,6 +201,13 @@ function MMF_BuildUnitFramesOverlaysSection(ctx)
                 MattMinimalFramesDB.healPredictionColorG = 0.827
                 MattMinimalFramesDB.healPredictionColorB = 0.765
                 OnPredictionChanged()
+            end,
+            isDefault = function()
+                local db = MattMinimalFramesDB or {}
+                local defaults = MattMinimalFrames_Defaults or {}
+                return ClampColorChannel(db.healPredictionColorR, defaults.healPredictionColorR) == ClampColorChannel(defaults.healPredictionColorR, 0.0)
+                    and ClampColorChannel(db.healPredictionColorG, defaults.healPredictionColorG) == ClampColorChannel(defaults.healPredictionColorG, 0.827)
+                    and ClampColorChannel(db.healPredictionColorB, defaults.healPredictionColorB) == ClampColorChannel(defaults.healPredictionColorB, 0.765)
             end,
         })
     end
@@ -243,6 +250,13 @@ function MMF_BuildUnitFramesOverlaysSection(ctx)
                 MattMinimalFramesDB.absorbBarColorG = 0.84
                 MattMinimalFramesDB.absorbBarColorB = 1.0
                 OnPredictionChanged()
+            end,
+            isDefault = function()
+                local db = MattMinimalFramesDB or {}
+                local defaults = MattMinimalFrames_Defaults or {}
+                return ClampColorChannel(db.absorbBarColorR, defaults.absorbBarColorR) == ClampColorChannel(defaults.absorbBarColorR, 0.62)
+                    and ClampColorChannel(db.absorbBarColorG, defaults.absorbBarColorG) == ClampColorChannel(defaults.absorbBarColorG, 0.84)
+                    and ClampColorChannel(db.absorbBarColorB, defaults.absorbBarColorB) == ClampColorChannel(defaults.absorbBarColorB, 1.0)
             end,
         })
     end
