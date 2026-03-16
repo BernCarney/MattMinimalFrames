@@ -25,7 +25,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     local controlRightPadding = hasDefault and (resetWidth + 4) or 0
 
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(width + controlRightPadding, 24)
+    container:SetSize(width, 24)
     container:SetPoint("TOPLEFT", x, y)
 
     local text = container:CreateFontString(nil, "OVERLAY")
@@ -52,7 +52,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     valueText:SetTextColor(accent[1], accent[2], accent[3])
     valueText:SetHitRectInsets(0, 0, 0, 0)
 
-    local sliderWidth = math.max(30, width - 155)
+    local sliderWidth = math.max(30, width - 155 - controlRightPadding)
     local slider = CreateFrame("Slider", nil, container, "BackdropTemplate")
     slider:SetSize(sliderWidth, 8)
     slider:SetPoint("LEFT", 105, 0)

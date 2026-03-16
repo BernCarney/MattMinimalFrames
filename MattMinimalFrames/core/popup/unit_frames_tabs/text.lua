@@ -316,7 +316,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
             local unit = db.textSizeUnit or "player"
             local key = GetNameTextSizeKeyForUnit(unit)
             local defaultValue = tonumber(d[key]) or 12
-            local currentValue = tonumber(db[key]) or defaultValue
+            local currentValue = GetNameTextSizeForUnit(unit)
             return currentValue == defaultValue
         end,
         onReset = function()
@@ -350,7 +350,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
             local unit = db.textSizeUnit or "player"
             local key = GetHPTextSizeKeyForUnit(unit)
             local defaultValue = tonumber(d[key]) or 13
-            local currentValue = tonumber(db[key]) or defaultValue
+            local currentValue = GetHPTextSizeForUnit(unit)
             return currentValue == defaultValue
         end,
         onReset = function()
