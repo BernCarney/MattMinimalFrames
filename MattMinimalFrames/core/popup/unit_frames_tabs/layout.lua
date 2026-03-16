@@ -82,6 +82,7 @@ function MMF_BuildUnitFramesLayoutSection(ctx)
 
     local scaleUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "frameScaleUnit",
         x = LEFT_COL_X,
         y = -40,
         width = LEFT_COL_WIDTH,

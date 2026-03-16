@@ -18,7 +18,14 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
     local fontPath = (config and config.fontPath) or "Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf"
     local width = (config and config.width) or 300
     local labelWidth = (config and config.labelWidth) or 95
-    local buttonWidth = (config and config.buttonWidth) or (width - labelWidth - 9)
+    local fullButtonWidth = (config and config.buttonWidth) or (width - labelWidth - 9)
+    local defaults = type(MattMinimalFrames_Defaults) == "table" and MattMinimalFrames_Defaults or nil
+    local settingKey = config and config.settingKey
+    local hasDefault = type(settingKey) == "string" and defaults and defaults[settingKey] ~= nil
+    local hasReset = hasDefault and (config and config.enableReset == true)
+    local resetWidth = hasReset and 52 or 0
+    local resetGap = hasReset and 4 or 0
+    local buttonWidth = hasReset and math.max(70, fullButtonWidth - resetWidth - resetGap) or fullButtonWidth
     local buttonOffset = (config and config.buttonOffset) or (labelWidth + 9)
     local visibleRows = math.max(1, (config and config.visibleRows) or 8)
     local placeholderText = (config and config.placeholderText) or "Select..."
@@ -188,6 +195,40 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         arrowText:SetTextColor(0.92, 0.92, 0.92)
     end)
 
+    local resetButton
+    if hasReset then
+        resetButton = CreateFrame("Button", nil, container, "BackdropTemplate")
+        resetButton:SetSize(resetWidth, 20)
+        resetButton:SetPoint("LEFT", button, "RIGHT", resetGap, 0)
+        resetButton:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        resetButton:SetBackdropColor(0.06, 0.06, 0.08, 1)
+        resetButton:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+
+        local resetText = resetButton:CreateFontString(nil, "OVERLAY")
+        TrySetFont(resetText, fontPath, 10, "")
+        resetText:SetPoint("CENTER")
+        resetText:SetTextColor(0.85, 0.85, 0.85)
+        resetText:SetText("RESET")
+        resetButton.text = resetText
+
+        resetButton:SetScript("OnEnter", function(self)
+            self:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.6)
+            if self.text then
+                self.text:SetTextColor(1, 1, 1)
+            end
+        end)
+        resetButton:SetScript("OnLeave", function(self)
+            self:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+            if self.text then
+                self.text:SetTextColor(0.85, 0.85, 0.85)
+            end
+        end)
+    end
+
     local listParent = popup or parent
     local list = CreateFrame("Frame", nil, listParent, "BackdropTemplate")
     list:SetSize(buttonWidth, (visibleRows * rowHeight) + listPadding)
@@ -310,6 +351,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
     end
 
     local dropdown = {}
+    local RefreshResetVisibility
 
     function dropdown.Close()
         list:Hide()
@@ -321,6 +363,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
     function dropdown.SetSelectedValue(value)
         selectedValue = value
         UpdateButtonTextFromSelection()
+        RefreshResetVisibility()
     end
 
     function dropdown.SetOptions(newOptions)
@@ -330,6 +373,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         end
         UpdateButtonTextFromSelection()
         RefreshRows()
+        RefreshResetVisibility()
     end
 
     function dropdown.GetOptions()
@@ -340,6 +384,38 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         return selectedValue
     end
 
+    local function GetCurrentValue()
+        if config and config.getValue then
+            return config.getValue()
+        end
+        return selectedValue
+    end
+
+    local function IsValueDefault()
+        if not hasReset then
+            return true
+        end
+        if config and type(config.isDefault) == "function" then
+            local ok, result = pcall(config.isDefault, dropdown)
+            if ok then
+                return result == true
+            end
+        end
+        local defaultValue = defaults[settingKey]
+        local currentValue = GetCurrentValue()
+        if currentValue == nil then
+            currentValue = defaultValue
+        end
+        return currentValue == defaultValue
+    end
+
+    RefreshResetVisibility = function()
+        if not resetButton then
+            return
+        end
+        resetButton:SetShown(not IsValueDefault())
+    end
+
     local function SelectOption(option)
         if not option then return end
         if option.divider then return end
@@ -348,6 +424,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         if config and config.onSelect then
             config.onSelect(option.value, option, dropdown)
         end
+        RefreshResetVisibility()
         dropdown.Close()
     end
 
@@ -417,6 +494,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         if config and config.getValue then
             selectedValue = config.getValue()
             UpdateButtonTextFromSelection()
+            RefreshResetVisibility()
         end
 
         if #options == 0 then
@@ -454,8 +532,31 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         selectedValue = config.selectedValue
     end
 
+    if resetButton then
+        resetButton:SetScript("OnClick", function()
+            if not hasDefault then
+                return
+            end
+            local defaultValue = defaults[settingKey]
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            MattMinimalFramesDB[settingKey] = defaultValue
+
+            local option = GetOptionByValue(defaultValue)
+            selectedValue = defaultValue
+            UpdateButtonTextFromSelection()
+            if config and config.onSelect then
+                config.onSelect(defaultValue, option, dropdown)
+            end
+            RefreshRows()
+            RefreshResetVisibility()
+        end)
+    end
+
     UpdateButtonTextFromSelection()
     RefreshRows()
+    RefreshResetVisibility()
 
     local function RefreshDropdownVisual()
         TrySetFont(label, fontPath, 10, "")
@@ -468,6 +569,7 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
         end
         UpdateButtonTextFromSelection()
         RefreshRows()
+        RefreshResetVisibility()
     end
 
     container:SetScript("OnShow", RefreshDropdownVisual)
@@ -480,11 +582,14 @@ function MMF_CreateMinimalDropdown(parent, popup, config)
     dropdown.list = list
     dropdown.scrollBar = scrollBar
     dropdown.RefreshRows = RefreshRows
+    dropdown.resetButton = resetButton
+    dropdown.RefreshResetVisibility = RefreshResetVisibility
 
     container.labelText = label
     container.mmfLabelRaw = dropdownLabel
     container.MMFRefreshWidget = RefreshDropdownVisual
+    container.resetButton = resetButton
+    container.RefreshResetVisibility = RefreshResetVisibility
 
     return dropdown
 end
-

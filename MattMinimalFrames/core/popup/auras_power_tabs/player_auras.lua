@@ -14,13 +14,17 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
     aurasTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
     aurasTitle:SetText("PLAYER AURA POSITION")
 
-    CreateMinimalCheckbox(root, "Buffs", AURA_COL_X, -32, "showPlayerBuffs", false, function()
+    local BUFF_TOGGLE_Y = -32
+    local DEBUFF_TOGGLE_Y = -56
+    local AURA_TYPE_Y = -84
+
+    CreateMinimalCheckbox(root, "Buffs", AURA_COL_X, BUFF_TOGGLE_Y, "showPlayerBuffs", false, function()
         if MMF_UpdatePlayerAuras then
             MMF_UpdatePlayerAuras()
         end
     end)
 
-    CreateMinimalCheckbox(root, "Debuffs", AURA_COL_X + 120, -32, "showPlayerDebuffs", false, function()
+    CreateMinimalCheckbox(root, "Debuffs", AURA_COL_X, DEBUFF_TOGGLE_Y, "showPlayerDebuffs", false, function()
         if MMF_UpdatePlayerAuras then
             MMF_UpdatePlayerAuras()
         end
@@ -39,8 +43,9 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
 
     local auraTypeDropdown = MMF_CreateMinimalDropdown(root, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "playerAuraOffsetType",
         x = AURA_COL_X,
-        y = -76,
+        y = AURA_TYPE_Y,
         width = AURA_COL_WIDTH,
         labelWidth = 74,
         buttonOffset = 78,
@@ -96,8 +101,11 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         end
     end
 
+    local RefreshPositionResetButtons = function() end
+
     local buffDirectionDropdown = MMF_CreateMinimalDropdown(root, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "playerBuffAuraDirection",
         x = AURA_COL_X,
         y = -164,
         width = AURA_COL_WIDTH,
@@ -113,12 +121,14 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         onSelect = function(value)
             MattMinimalFramesDB.playerBuffAuraDirection = NormalizeAuraDirection(value, "right_down")
             RefreshAuraDirection()
+            RefreshPositionResetButtons()
         end,
     })
     dropdownLists.playerBuffAuraDirectionList = buffDirectionDropdown.list
 
     local debuffDirectionDropdown = MMF_CreateMinimalDropdown(root, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "playerDebuffAuraDirection",
         x = AURA_COL_X,
         y = -192,
         width = AURA_COL_WIDTH,
@@ -134,6 +144,7 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         onSelect = function(value)
             MattMinimalFramesDB.playerDebuffAuraDirection = NormalizeAuraDirection(value, "left_up")
             RefreshAuraDirection()
+            RefreshPositionResetButtons()
         end,
     })
     dropdownLists.playerDebuffAuraDirectionList = debuffDirectionDropdown.list
@@ -166,6 +177,7 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
                 MMF_UpdatePlayerBuffPosition(value, MattMinimalFramesDB[yKey] or -6)
             end
         end
+        RefreshPositionResetButtons()
     end, true)
 
     local auraYSlider = CreateMinimalSlider(root, "Y Offset", AURA_COL_X, -132, AURA_COL_WIDTH, "__tempPlayerAuraOffsetY", -200, 200, 1, -6, function(value)
@@ -180,6 +192,7 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
                 MMF_UpdatePlayerBuffPosition(MattMinimalFramesDB[xKey] or 2, value)
             end
         end
+        RefreshPositionResetButtons()
     end, true)
 
     SyncAuraOffsetSliders = function()
@@ -195,6 +208,36 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
     local LEGACY_PLAYER_DEBUFF_X = -2
     local LEGACY_PLAYER_DEBUFF_Y = 27
     local LEGACY_PLAYER_DEBUFF_DIRECTION = "left_up"
+
+    local buffPositionResetButton
+    local debuffPositionResetButton
+
+    local function IsPositionDefault(kind)
+        local db = MattMinimalFramesDB or {}
+        if kind == "debuff" then
+            local x = tonumber(db.playerDebuffXOffset) or LEGACY_PLAYER_DEBUFF_X
+            local y = tonumber(db.playerDebuffYOffset) or LEGACY_PLAYER_DEBUFF_Y
+            local dir = NormalizeAuraDirection(db.playerDebuffAuraDirection, "left_up")
+            return x == LEGACY_PLAYER_DEBUFF_X
+                and y == LEGACY_PLAYER_DEBUFF_Y
+                and dir == NormalizeAuraDirection(LEGACY_PLAYER_DEBUFF_DIRECTION, "left_up")
+        end
+        local x = tonumber(db.playerBuffXOffset) or LEGACY_PLAYER_BUFF_X
+        local y = tonumber(db.playerBuffYOffset) or LEGACY_PLAYER_BUFF_Y
+        local dir = NormalizeAuraDirection(db.playerBuffAuraDirection, "right_down")
+        return x == LEGACY_PLAYER_BUFF_X
+            and y == LEGACY_PLAYER_BUFF_Y
+            and dir == NormalizeAuraDirection(LEGACY_PLAYER_BUFF_DIRECTION, "right_down")
+    end
+
+    RefreshPositionResetButtons = function()
+        if buffPositionResetButton then
+            buffPositionResetButton:SetShown(not IsPositionDefault("buff"))
+        end
+        if debuffPositionResetButton then
+            debuffPositionResetButton:SetShown(not IsPositionDefault("debuff"))
+        end
+    end
 
     local function ResetPlayerAuraPosition(kind)
         if kind == "debuff" then
@@ -229,6 +272,7 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         elseif MMF_UpdatePlayerAuras then
             MMF_UpdatePlayerAuras()
         end
+        RefreshPositionResetButtons()
     end
 
     local resetGap = 8
@@ -271,12 +315,13 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         return button
     end
 
-    CreateAuraResetButton(AURA_COL_X, -250, "Reset Buff Position", function()
+    buffPositionResetButton = CreateAuraResetButton(AURA_COL_X, -250, "Reset Buff Position", function()
         ResetPlayerAuraPosition("buff")
     end)
-    CreateAuraResetButton(AURA_COL_X + resetButtonWidth + resetGap, -250, "Reset Debuff Position", function()
+    debuffPositionResetButton = CreateAuraResetButton(AURA_COL_X + resetButtonWidth + resetGap, -250, "Reset Debuff Position", function()
         ResetPlayerAuraPosition("debuff")
     end)
+    RefreshPositionResetButtons()
 
     local divider1 = root:CreateTexture(nil, "ARTWORK")
     divider1:SetSize(AURA_COL_WIDTH, 1)
@@ -295,7 +340,7 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         end
     end)
 
-    CreateMinimalCheckbox(root, "Hide Blizzard Debuffs", AURA_COL_X + 150, -322, "hideBlizzardPlayerDebuffs", false, function()
+    CreateMinimalCheckbox(root, "Hide Blizzard Debuffs", AURA_COL_X, -346, "hideBlizzardPlayerDebuffs", false, function()
         if MMF_UpdateBlizzardPlayerAuraVisibility then
             MMF_UpdateBlizzardPlayerAuraVisibility()
         end
@@ -313,8 +358,9 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
     local SyncAuraAppearanceSliders = function() end
     local appearanceTypeDropdown = MMF_CreateMinimalDropdown(root, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "playerAuraAppearanceType",
         x = AURA_COL_X,
-        y = -346,
+        y = -370,
         width = AURA_COL_WIDTH,
         labelWidth = 112,
         buttonOffset = 116,
@@ -339,45 +385,127 @@ function MMF_BuildAurasPowerPlayerAurasSection(ctx)
         return "playerBuffAuraIconSize", "playerBuffAuraIconsPerRow", "playerBuffAuraRows", 18, 4, 3
     end
 
-    local auraIconSizeSlider = CreateMinimalSlider(root, "Icon Size", AURA_COL_X, -370, AURA_COL_WIDTH, "__tempPlayerAuraAppearanceIconSize", 12, 40, 1, 18, function(value)
+    local function GetAppearanceDefaultValues()
+        local defaults = MattMinimalFrames_Defaults or {}
+        local sizeKey, perRowKey, rowsKey, defaultSize, defaultPerRow, defaultRows = GetAuraAppearanceKeys()
+        return sizeKey, perRowKey, rowsKey,
+            tonumber(defaults[sizeKey]) or defaultSize,
+            tonumber(defaults[perRowKey]) or defaultPerRow,
+            tonumber(defaults[rowsKey]) or defaultRows
+    end
+
+    local auraIconSizeSlider
+    local auraIconsPerRowSlider
+    local auraRowsSlider
+
+    auraIconSizeSlider = CreateMinimalSlider(root, "Icon Size", AURA_COL_X, -394, AURA_COL_WIDTH, "__tempPlayerAuraAppearanceIconSize", 12, 40, 1, 18, function(value)
         local sizeKey = GetAuraAppearanceKeys()
         MattMinimalFramesDB[sizeKey] = math.floor((tonumber(value) or 18) + 0.5)
         if MMF_UpdateAuraLayout then
             MMF_UpdateAuraLayout()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local sizeKey, _, _, defaultSize = GetAppearanceDefaultValues()
+            local current = tonumber(db[sizeKey]) or defaultSize
+            return current == defaultSize
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local sizeKey, _, _, defaultSize = GetAppearanceDefaultValues()
+            MattMinimalFramesDB[sizeKey] = defaultSize
+            if auraIconSizeSlider and auraIconSizeSlider.slider then
+                auraIconSizeSlider.slider:SetValue(defaultSize)
+            end
+            if MMF_UpdateAuraLayout then
+                MMF_UpdateAuraLayout()
+            end
+        end,
+    })
 
-    local auraIconsPerRowSlider = CreateMinimalSlider(root, "Icons Per Row", AURA_COL_X, -394, AURA_COL_WIDTH, "__tempPlayerAuraAppearancePerRow", 1, 16, 1, 4, function(value)
+    auraIconsPerRowSlider = CreateMinimalSlider(root, "Icons Per Row", AURA_COL_X, -418, AURA_COL_WIDTH, "__tempPlayerAuraAppearancePerRow", 1, 16, 1, 4, function(value)
         local _, perRowKey = GetAuraAppearanceKeys()
         MattMinimalFramesDB[perRowKey] = math.floor((tonumber(value) or 4) + 0.5)
         if MMF_UpdateAuraLayout then
             MMF_UpdateAuraLayout()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local _, perRowKey, _, _, defaultPerRow = GetAppearanceDefaultValues()
+            local current = tonumber(db[perRowKey]) or defaultPerRow
+            return current == defaultPerRow
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local _, perRowKey, _, _, defaultPerRow = GetAppearanceDefaultValues()
+            MattMinimalFramesDB[perRowKey] = defaultPerRow
+            if auraIconsPerRowSlider and auraIconsPerRowSlider.slider then
+                auraIconsPerRowSlider.slider:SetValue(defaultPerRow)
+            end
+            if MMF_UpdateAuraLayout then
+                MMF_UpdateAuraLayout()
+            end
+        end,
+    })
 
-    local auraRowsSlider = CreateMinimalSlider(root, "Rows", AURA_COL_X, -418, AURA_COL_WIDTH, "__tempPlayerAuraAppearanceRows", 1, 16, 1, 3, function(value)
+    auraRowsSlider = CreateMinimalSlider(root, "Rows", AURA_COL_X, -442, AURA_COL_WIDTH, "__tempPlayerAuraAppearanceRows", 1, 16, 1, 3, function(value)
         local _, _, rowsKey = GetAuraAppearanceKeys()
         MattMinimalFramesDB[rowsKey] = math.floor((tonumber(value) or 3) + 0.5)
         if MMF_UpdateAuraLayout then
             MMF_UpdateAuraLayout()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local _, _, rowsKey, _, _, defaultRows = GetAppearanceDefaultValues()
+            local current = tonumber(db[rowsKey]) or defaultRows
+            return current == defaultRows
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local _, _, rowsKey, _, _, defaultRows = GetAppearanceDefaultValues()
+            MattMinimalFramesDB[rowsKey] = defaultRows
+            if auraRowsSlider and auraRowsSlider.slider then
+                auraRowsSlider.slider:SetValue(defaultRows)
+            end
+            if MMF_UpdateAuraLayout then
+                MMF_UpdateAuraLayout()
+            end
+        end,
+    })
 
     SyncAuraAppearanceSliders = function()
         local sizeKey, perRowKey, rowsKey, defaultSize, defaultPerRow, defaultRows = GetAuraAppearanceKeys()
         auraIconSizeSlider.slider:SetValue(MattMinimalFramesDB[sizeKey] or MattMinimalFramesDB.playerBuffAuraIconSize or defaultSize)
         auraIconsPerRowSlider.slider:SetValue(MattMinimalFramesDB[perRowKey] or MattMinimalFramesDB.playerBuffAuraIconsPerRow or defaultPerRow)
         auraRowsSlider.slider:SetValue(MattMinimalFramesDB[rowsKey] or MattMinimalFramesDB.playerBuffAuraRows or defaultRows)
+        if auraIconSizeSlider.RefreshResetVisibility then
+            auraIconSizeSlider:RefreshResetVisibility()
+        end
+        if auraIconsPerRowSlider.RefreshResetVisibility then
+            auraIconsPerRowSlider:RefreshResetVisibility()
+        end
+        if auraRowsSlider.RefreshResetVisibility then
+            auraRowsSlider:RefreshResetVisibility()
+        end
     end
     SyncAuraAppearanceSliders()
 
-    CreateMinimalSlider(root, "Stack Text", AURA_COL_X, -442, AURA_COL_WIDTH, "auraTextScale", 0.5, 2.0, 0.1, 1.0, function(value)
+    CreateMinimalSlider(root, "Stack Text", AURA_COL_X, -466, AURA_COL_WIDTH, "auraTextScale", 0.5, 2.0, 0.1, 1.0, function(value)
         if MMF_UpdateAuraTextScale then
             MMF_UpdateAuraTextScale(value)
         end
     end, false)
 
-    CreateMinimalSlider(root, "Timer Text", AURA_COL_X, -466, AURA_COL_WIDTH, "timerTextScale", 0.5, 2.0, 0.1, 1.0, function(value)
+    CreateMinimalSlider(root, "Timer Text", AURA_COL_X, -486, AURA_COL_WIDTH, "timerTextScale", 0.5, 2.0, 0.1, 1.0, function(value)
         if MMF_UpdateTimerTextScale then
             MMF_UpdateTimerTextScale(value)
         end

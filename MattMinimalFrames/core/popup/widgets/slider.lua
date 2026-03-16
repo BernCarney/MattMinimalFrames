@@ -13,13 +13,19 @@ local function GetAccentColor()
     return { 0.6, 0.4, 0.9 }
 end
 
-function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal, maxVal, step, defaultVal, onChange, isInteger)
+function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal, maxVal, step, defaultVal, onChange, isInteger, resetConfig)
     local accent = GetAccentColor()
     local isTBC = Compat.IsTBC
     local sliderLabel = tostring(label or "")
+    local defaults = type(MattMinimalFrames_Defaults) == "table" and MattMinimalFrames_Defaults or nil
+    local customReset = type(resetConfig) == "table" and resetConfig or nil
+    local hasDefault = (type(settingKey) == "string" and defaults and defaults[settingKey] ~= nil)
+        or (customReset and (type(customReset.onReset) == "function" or type(customReset.isDefault) == "function"))
+    local resetWidth = hasDefault and 52 or 0
+    local controlRightPadding = hasDefault and (resetWidth + 4) or 0
 
     local container = CreateFrame("Frame", nil, parent)
-    container:SetSize(width, 24)
+    container:SetSize(width + controlRightPadding, 24)
     container:SetPoint("TOPLEFT", x, y)
 
     local text = container:CreateFontString(nil, "OVERLAY")
@@ -32,7 +38,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
 
     local valueBg = CreateFrame("Frame", nil, container, "BackdropTemplate")
     valueBg:SetSize(40, 18)
-    valueBg:SetPoint("RIGHT", 0, 0)
+    valueBg:SetPoint("RIGHT", -controlRightPadding, 0)
     valueBg:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
     valueBg:SetBackdropColor(0.06, 0.06, 0.08, 1)
     valueBg:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
@@ -46,7 +52,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     valueText:SetTextColor(accent[1], accent[2], accent[3])
     valueText:SetHitRectInsets(0, 0, 0, 0)
 
-    local sliderWidth = width - 155
+    local sliderWidth = math.max(30, width - 155)
     local slider = CreateFrame("Slider", nil, container, "BackdropTemplate")
     slider:SetSize(sliderWidth, 8)
     slider:SetPoint("LEFT", 105, 0)
@@ -170,12 +176,93 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
         MattMinimalFramesDB[settingKey] = value
         UpdateFill()
         if onChange then onChange(value) end
+        if container.RefreshResetVisibility then
+            container.RefreshResetVisibility()
+        end
     end)
+
+    local resetButton
+    if hasDefault then
+        resetButton = CreateFrame("Button", nil, container, "BackdropTemplate")
+        resetButton:SetSize(resetWidth, 18)
+        resetButton:SetPoint("RIGHT", 0, 0)
+        resetButton:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        resetButton:SetBackdropColor(0.06, 0.06, 0.08, 1)
+        resetButton:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+
+        local resetText = resetButton:CreateFontString(nil, "OVERLAY")
+        resetText:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 10, "")
+        resetText:SetPoint("CENTER")
+        resetText:SetTextColor(0.85, 0.85, 0.85)
+        resetText:SetText("RESET")
+        resetButton.text = resetText
+
+        resetButton:SetScript("OnEnter", function(self)
+            self:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.6)
+            if self.text then
+                self.text:SetTextColor(1, 1, 1)
+            end
+        end)
+        resetButton:SetScript("OnLeave", function(self)
+            self:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+            if self.text then
+                self.text:SetTextColor(0.85, 0.85, 0.85)
+            end
+        end)
+        resetButton:SetScript("OnClick", function()
+            if customReset and type(customReset.onReset) == "function" then
+                customReset.onReset()
+            else
+                local defaultValue = defaults and defaults[settingKey]
+                slider:SetValue(tonumber(defaultValue) or defaultValue)
+            end
+            if container.RefreshResetVisibility then
+                container.RefreshResetVisibility()
+            end
+        end)
+    end
+
+    local function ValuesEqual(a, b)
+        if type(a) == "number" and type(b) == "number" then
+            return math.abs(a - b) < 0.0001
+        end
+        return a == b
+    end
+
+    local function IsValueDefault()
+        if not hasDefault then
+            return true
+        end
+        if customReset and type(customReset.isDefault) == "function" then
+            local ok, isDefaultValue = pcall(customReset.isDefault, slider)
+            if ok then
+                return isDefaultValue == true
+            end
+        end
+        local defaultValue = defaults[settingKey]
+        local currentValue = MattMinimalFramesDB and MattMinimalFramesDB[settingKey]
+        if currentValue == nil then
+            currentValue = defaultValue
+        end
+        return ValuesEqual(currentValue, defaultValue)
+    end
+
+    local function RefreshResetVisibility()
+        if not resetButton then
+            return
+        end
+        resetButton:SetShown(not IsValueDefault())
+    end
 
     local function RefreshSliderVisual()
         text:SetText(sliderLabel)
         valueText:SetText(formatForDisplay(slider:GetValue()))
         UpdateFill()
+        RefreshResetVisibility()
     end
 
     container:SetScript("OnShow", RefreshSliderVisual)
@@ -185,6 +272,8 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     container.mmfLabelRaw = sliderLabel
     container.MMFRefreshWidget = RefreshSliderVisual
     container.valueText = valueText
+    container.resetButton = resetButton
+    container.RefreshResetVisibility = RefreshResetVisibility
+    RefreshResetVisibility()
     return container
 end
-

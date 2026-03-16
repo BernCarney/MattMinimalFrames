@@ -39,6 +39,7 @@ function MMF_BuildUnitFramesCastBarsSection(ctx)
 
     local castBarColorDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "castBarColor",
         x = MIDDLE_COL_X,
         y = -260 + RIGHT_COL_Y_OFFSET,
         width = MIDDLE_COL_WIDTH,

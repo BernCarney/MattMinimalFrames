@@ -89,6 +89,7 @@ function MMF_BuildUnitFramesMediaSection(ctx)
 
     rightSection.unitTextureDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "statusBarTexture",
         x = RIGHT_COL_X,
         y = -332 + RIGHT_STACK_Y_OFFSET,
         width = RIGHT_COL_WIDTH,
@@ -172,6 +173,7 @@ function MMF_BuildUnitFramesMediaSection(ctx)
 
     rightSection.unitFontDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "globalFont",
         fontPath = STANDARD_TEXT_FONT or "Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf",
         preserveWidgetFont = true,
         previewOptionFonts = true,
@@ -296,6 +298,13 @@ function MMF_BuildUnitFramesMediaSection(ctx)
                 MMF_ApplyHealthBarBackgroundColor()
             end
         end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.healthBarBGColorR == d.healthBarBGColorR)
+                and (db.healthBarBGColorG == d.healthBarBGColorG)
+                and (db.healthBarBGColorB == d.healthBarBGColorB)
+        end,
     })
 
     CreateMinimalSlider(unitFramesCol, "Health BG Alpha", RIGHT_COL_X, healthBGAlphaY, RIGHT_COL_WIDTH, "healthBarBGAlpha", 0.0, 1.0, 0.05, 0.65, function(value)
@@ -344,6 +353,13 @@ function MMF_BuildUnitFramesMediaSection(ctx)
             if MMF_ApplyHealthBarBorderStyle then
                 MMF_ApplyHealthBarBorderStyle()
             end
+        end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.healthBarBorderColorR == d.healthBarBorderColorR)
+                and (db.healthBarBorderColorG == d.healthBarBorderColorG)
+                and (db.healthBarBorderColorB == d.healthBarBorderColorB)
         end,
     })
 
@@ -469,6 +485,11 @@ function MMF_BuildUnitFramesMediaSection(ctx)
             MattMinimalFramesDB.playerBarColorMode = "class"
             RequestFrameColorRefresh("player")
         end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.playerBarColorMode or "class") == (d.playerBarColorMode or "class")
+        end,
     })
 
     rightSection.targetFrameColorPicker = MMF_CreateMinimalColorPicker(unitFramesCol, {
@@ -505,6 +526,11 @@ function MMF_BuildUnitFramesMediaSection(ctx)
         onReset = function()
             MattMinimalFramesDB.targetBarColorMode = "default"
             RequestFrameColorRefresh("target")
+        end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.targetBarColorMode or "default") == (d.targetBarColorMode or "default")
         end,
     })
 
@@ -543,6 +569,11 @@ function MMF_BuildUnitFramesMediaSection(ctx)
             MattMinimalFramesDB.totBarColorMode = "default"
             RequestFrameColorRefresh("targettarget")
         end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.totBarColorMode or "default") == (d.totBarColorMode or "default")
+        end,
     })
 
     rightSection.focusFrameColorPicker = MMF_CreateMinimalColorPicker(unitFramesCol, {
@@ -579,6 +610,11 @@ function MMF_BuildUnitFramesMediaSection(ctx)
         onReset = function()
             MattMinimalFramesDB.focusBarColorMode = "default"
             RequestFrameColorRefresh("focus")
+        end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.focusBarColorMode or "default") == (d.focusBarColorMode or "default")
         end,
     })
 
@@ -617,6 +653,10 @@ function MMF_BuildUnitFramesMediaSection(ctx)
             MattMinimalFramesDB.petBarColorMode = "default"
             RequestFrameColorRefresh("pet")
         end,
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            return (db.petBarColorMode or "default") == (d.petBarColorMode or "default")
+        end,
     })
 end
-

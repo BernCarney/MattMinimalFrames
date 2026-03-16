@@ -130,6 +130,10 @@ function MMF_BuildUnitFramesTextSection(ctx)
         return value
     end
 
+    local function GetNameTextSizeKeyForUnit(unit)
+        return GetTextSizePrefix(unit) .. "NameTextSize"
+    end
+
     local function GetHPTextSizeForUnit(unit)
         local prefix = GetTextSizePrefix(unit)
         local key = prefix .. "HPTextSize"
@@ -141,6 +145,10 @@ function MMF_BuildUnitFramesTextSection(ctx)
         if value < 8 then value = 8 end
         if value > 20 then value = 20 end
         return value
+    end
+
+    local function GetHPTextSizeKeyForUnit(unit)
+        return GetTextSizePrefix(unit) .. "HPTextSize"
     end
 
     local function GetSpellNameTextSizeForUnit(unit)
@@ -159,6 +167,10 @@ function MMF_BuildUnitFramesTextSection(ctx)
         return value
     end
 
+    local function GetSpellNameTextSizeKeyForUnit(unit)
+        return unit .. "SpellNameTextSize"
+    end
+
     local function GetCastTimeTextSizeForUnit(unit)
         if not IsCastBarTextUnit(unit) then
             return 9
@@ -168,6 +180,10 @@ function MMF_BuildUnitFramesTextSection(ctx)
         if value < 8 then value = 8 end
         if value > 20 then value = 20 end
         return value
+    end
+
+    local function GetCastTimeTextSizeKeyForUnit(unit)
+        return unit .. "CastTimeTextSize"
     end
 
     local textUnitOptions = {
@@ -256,6 +272,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
 
     local frameTextUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "textSizeUnit",
         x = LEFT_COL_X,
         y = -128,
         width = LEFT_COL_WIDTH,
@@ -279,7 +296,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
     nameTextSlider = CreateMinimalSlider(unitFramesCol, "Name Size", LEFT_COL_X, -152, LEFT_COL_WIDTH, "__tempNameTextSize", 8, 20, 1, 12, function(value)
         if syncingFrameTextSize then return end
         local unit = MattMinimalFramesDB.textSizeUnit or "player"
-        local key = GetTextSizePrefix(unit) .. "NameTextSize"
+        local key = GetNameTextSizeKeyForUnit(unit)
         MattMinimalFramesDB[key] = value
         if MMF_UpdateNameTextSize then
             MMF_UpdateNameTextSize(value, unit)
@@ -292,23 +309,71 @@ function MMF_BuildUnitFramesTextSection(ctx)
         else
             RequestNameTextRefresh()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            local key = GetNameTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 12
+            local currentValue = tonumber(db[key]) or defaultValue
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            local key = GetNameTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 12
+            db[key] = defaultValue
+            if nameTextSlider and nameTextSlider.slider then
+                nameTextSlider.slider:SetValue(defaultValue)
+            end
+        end,
+    })
 
     hpTextSlider = CreateMinimalSlider(unitFramesCol, "HP Size", LEFT_COL_X, -176, LEFT_COL_WIDTH, "__tempHPTextSize", 8, 20, 1, 13, function(value)
         if syncingFrameTextSize then return end
         local unit = MattMinimalFramesDB.textSizeUnit or "player"
-        local key = GetTextSizePrefix(unit) .. "HPTextSize"
+        local key = GetHPTextSizeKeyForUnit(unit)
         MattMinimalFramesDB[key] = value
         if MMF_UpdateHPTextSize then
             MMF_UpdateHPTextSize(value, unit)
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            local key = GetHPTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 13
+            local currentValue = tonumber(db[key]) or defaultValue
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            local key = GetHPTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 13
+            db[key] = defaultValue
+            if hpTextSlider and hpTextSlider.slider then
+                hpTextSlider.slider:SetValue(defaultValue)
+            end
+        end,
+    })
 
     spellNameTextSlider = CreateMinimalSlider(unitFramesCol, "Spell Name", LEFT_COL_X, -200, LEFT_COL_WIDTH, "__tempSpellNameTextSize", 8, 20, 1, 12, function(value)
         if syncingFrameTextSize then return end
         local unit = MattMinimalFramesDB.textSizeUnit or "player"
         if not IsCastBarTextUnit(unit) then return end
-        MattMinimalFramesDB[unit .. "SpellNameTextSize"] = value
+        MattMinimalFramesDB[GetSpellNameTextSizeKeyForUnit(unit)] = value
         if MMF_GetFrameForUnit and MMF_UpdateUnitFrame then
             local ownerUnit = GetCastBarOwnerUnit(unit)
             local frame = MMF_GetFrameForUnit(ownerUnit)
@@ -318,14 +383,44 @@ function MMF_BuildUnitFramesTextSection(ctx)
         elseif MMF_RequestAllFramesUpdate then
             MMF_RequestAllFramesUpdate()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            if not IsCastBarTextUnit(unit) then
+                return true
+            end
+            local key = GetSpellNameTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 12
+            local currentValue = tonumber(db[key]) or defaultValue
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            if not IsCastBarTextUnit(unit) then
+                return
+            end
+            local key = GetSpellNameTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 12
+            db[key] = defaultValue
+            if spellNameTextSlider and spellNameTextSlider.slider then
+                spellNameTextSlider.slider:SetValue(defaultValue)
+            end
+        end,
+    })
     spellNameTextSlider:Hide()
 
     castTimeTextSlider = CreateMinimalSlider(unitFramesCol, "Cast Time", LEFT_COL_X, -224, LEFT_COL_WIDTH, "__tempCastTimeTextSize", 8, 20, 1, 9, function(value)
         if syncingFrameTextSize then return end
         local unit = MattMinimalFramesDB.textSizeUnit or "player"
         if not IsCastBarTextUnit(unit) then return end
-        MattMinimalFramesDB[unit .. "CastTimeTextSize"] = value
+        MattMinimalFramesDB[GetCastTimeTextSizeKeyForUnit(unit)] = value
         if MMF_GetFrameForUnit and MMF_UpdateUnitFrame then
             local ownerUnit = GetCastBarOwnerUnit(unit)
             local frame = MMF_GetFrameForUnit(ownerUnit)
@@ -335,7 +430,37 @@ function MMF_BuildUnitFramesTextSection(ctx)
         elseif MMF_RequestAllFramesUpdate then
             MMF_RequestAllFramesUpdate()
         end
-    end, true)
+    end, true, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            if not IsCastBarTextUnit(unit) then
+                return true
+            end
+            local key = GetCastTimeTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 9
+            local currentValue = tonumber(db[key]) or defaultValue
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textSizeUnit or "player"
+            if not IsCastBarTextUnit(unit) then
+                return
+            end
+            local key = GetCastTimeTextSizeKeyForUnit(unit)
+            local defaultValue = tonumber(d[key]) or 9
+            db[key] = defaultValue
+            if castTimeTextSlider and castTimeTextSlider.slider then
+                castTimeTextSlider.slider:SetValue(defaultValue)
+            end
+        end,
+    })
     castTimeTextSlider:Hide()
 
     MattMinimalFramesDB.__tempNameTextSize = nil
@@ -419,4 +544,3 @@ function MMF_BuildUnitFramesTextSection(ctx)
     UpdateNameFeatureState()
     UpdateFrameTextModeVisibility()
 end
-

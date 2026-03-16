@@ -132,6 +132,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
 
     rightSection.playerIconModeDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "playerFrameIconMode",
         x = RIGHT_COL_X,
         y = (-458 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET,
         width = RIGHT_COL_WIDTH,
@@ -194,6 +195,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
 
     rightSection.targetIconModeDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "targetFrameIconMode",
         x = RIGHT_COL_X,
         y = (-482 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET,
         width = RIGHT_COL_WIDTH,
@@ -266,12 +268,49 @@ function MMF_BuildUnitFramesIconsSection(ctx)
 
     local CreateMinimalSlider = ctx.createMinimalSlider
     local CreateMinimalCheckbox = ctx.createMinimalCheckbox
+    local defaults = MattMinimalFrames_Defaults or {}
+
+    local function IsPlayerIconDefault()
+        local db = MattMinimalFramesDB or {}
+        local defaultX = NormalizeIconOffset(defaults.playerFrameIconXOffset)
+        local defaultY = NormalizeIconOffset(defaults.playerFrameIconYOffset)
+        local defaultScale = NormalizeIconScale(defaults.playerFrameIconScale)
+        local currentX = NormalizeIconOffset(db.playerFrameIconXOffset)
+        local currentY = NormalizeIconOffset(db.playerFrameIconYOffset)
+        local currentScale = NormalizeIconScale(db.playerFrameIconScale)
+        return currentX == defaultX
+            and currentY == defaultY
+            and math.abs(currentScale - defaultScale) < 0.0001
+    end
+
+    local function IsTargetIconDefault()
+        local db = MattMinimalFramesDB or {}
+        local defaultX = NormalizeIconOffset(defaults.targetFrameIconXOffset)
+        local defaultY = NormalizeIconOffset(defaults.targetFrameIconYOffset)
+        local defaultScale = NormalizeIconScale(defaults.targetFrameIconScale)
+        local currentX = NormalizeIconOffset(db.targetFrameIconXOffset)
+        local currentY = NormalizeIconOffset(db.targetFrameIconYOffset)
+        local currentScale = NormalizeIconScale(db.targetFrameIconScale)
+        return currentX == defaultX
+            and currentY == defaultY
+            and math.abs(currentScale - defaultScale) < 0.0001
+    end
+
+    local function RefreshIconResetButtons()
+        if rightSection.resetPlayerIconButton then
+            rightSection.resetPlayerIconButton:SetShown(not IsPlayerIconDefault())
+        end
+        if rightSection.resetTargetIconButton then
+            rightSection.resetTargetIconButton:SetShown(not IsTargetIconDefault())
+        end
+    end
 
     rightSection.playerIconXSlider = CreateMinimalSlider(unitFramesCol, "Player Icon X", RIGHT_COL_X, (-506 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "playerFrameIconXOffset", -200, 200, 1, 0, function(value)
         MattMinimalFramesDB.playerFrameIconXOffset = NormalizeIconOffset(value)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("player")
         end
+        RefreshIconResetButtons()
     end, true)
 
     rightSection.playerIconYSlider = CreateMinimalSlider(unitFramesCol, "Player Icon Y", RIGHT_COL_X, (-530 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "playerFrameIconYOffset", -200, 200, 1, 0, function(value)
@@ -279,6 +318,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("player")
         end
+        RefreshIconResetButtons()
     end, true)
 
     rightSection.targetIconXSlider = CreateMinimalSlider(unitFramesCol, "Target Icon X", RIGHT_COL_X, (-554 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "targetFrameIconXOffset", -200, 200, 1, 0, function(value)
@@ -286,6 +326,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("target")
         end
+        RefreshIconResetButtons()
     end, true)
 
     rightSection.targetIconYSlider = CreateMinimalSlider(unitFramesCol, "Target Icon Y", RIGHT_COL_X, (-578 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "targetFrameIconYOffset", -200, 200, 1, 0, function(value)
@@ -293,6 +334,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("target")
         end
+        RefreshIconResetButtons()
     end, true)
 
     rightSection.playerIconScaleSlider = CreateMinimalSlider(unitFramesCol, "Player Icon Size", RIGHT_COL_X, (-602 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "playerFrameIconScale", 0.5, 3.0, 0.05, 1.0, function(value)
@@ -300,6 +342,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("player")
         end
+        RefreshIconResetButtons()
     end, false)
 
     rightSection.targetIconScaleSlider = CreateMinimalSlider(unitFramesCol, "Target Icon Size", RIGHT_COL_X, (-626 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, RIGHT_COL_WIDTH, "targetFrameIconScale", 0.5, 3.0, 0.05, 1.0, function(value)
@@ -307,6 +350,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("target")
         end
+        RefreshIconResetButtons()
     end, false)
 
     local function CreateIconResetButton(label, x, y, onClick)
@@ -342,28 +386,32 @@ function MMF_BuildUnitFramesIconsSection(ctx)
     end
 
     rightSection.resetPlayerIconButton = CreateIconResetButton("Reset Player Icon", RIGHT_COL_X, (-656 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, function()
-        MattMinimalFramesDB.playerFrameIconXOffset = 0
-        MattMinimalFramesDB.playerFrameIconYOffset = 0
-        MattMinimalFramesDB.playerFrameIconScale = 1.0
-        if rightSection.playerIconXSlider and rightSection.playerIconXSlider.slider then rightSection.playerIconXSlider.slider:SetValue(0) end
-        if rightSection.playerIconYSlider and rightSection.playerIconYSlider.slider then rightSection.playerIconYSlider.slider:SetValue(0) end
-        if rightSection.playerIconScaleSlider and rightSection.playerIconScaleSlider.slider then rightSection.playerIconScaleSlider.slider:SetValue(1.0) end
+        MattMinimalFramesDB.playerFrameIconXOffset = NormalizeIconOffset(defaults.playerFrameIconXOffset)
+        MattMinimalFramesDB.playerFrameIconYOffset = NormalizeIconOffset(defaults.playerFrameIconYOffset)
+        MattMinimalFramesDB.playerFrameIconScale = NormalizeIconScale(defaults.playerFrameIconScale)
+        if rightSection.playerIconXSlider and rightSection.playerIconXSlider.slider then rightSection.playerIconXSlider.slider:SetValue(MattMinimalFramesDB.playerFrameIconXOffset) end
+        if rightSection.playerIconYSlider and rightSection.playerIconYSlider.slider then rightSection.playerIconYSlider.slider:SetValue(MattMinimalFramesDB.playerFrameIconYOffset) end
+        if rightSection.playerIconScaleSlider and rightSection.playerIconScaleSlider.slider then rightSection.playerIconScaleSlider.slider:SetValue(MattMinimalFramesDB.playerFrameIconScale) end
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("player")
         end
+        RefreshIconResetButtons()
     end)
 
     rightSection.resetTargetIconButton = CreateIconResetButton("Reset Target Icon", RIGHT_COL_X + ICON_RESET_BUTTON_WIDTH + ICON_RESET_BUTTON_GAP, (-656 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, function()
-        MattMinimalFramesDB.targetFrameIconXOffset = 0
-        MattMinimalFramesDB.targetFrameIconYOffset = 0
-        MattMinimalFramesDB.targetFrameIconScale = 1.0
-        if rightSection.targetIconXSlider and rightSection.targetIconXSlider.slider then rightSection.targetIconXSlider.slider:SetValue(0) end
-        if rightSection.targetIconYSlider and rightSection.targetIconYSlider.slider then rightSection.targetIconYSlider.slider:SetValue(0) end
-        if rightSection.targetIconScaleSlider and rightSection.targetIconScaleSlider.slider then rightSection.targetIconScaleSlider.slider:SetValue(1.0) end
+        MattMinimalFramesDB.targetFrameIconXOffset = NormalizeIconOffset(defaults.targetFrameIconXOffset)
+        MattMinimalFramesDB.targetFrameIconYOffset = NormalizeIconOffset(defaults.targetFrameIconYOffset)
+        MattMinimalFramesDB.targetFrameIconScale = NormalizeIconScale(defaults.targetFrameIconScale)
+        if rightSection.targetIconXSlider and rightSection.targetIconXSlider.slider then rightSection.targetIconXSlider.slider:SetValue(MattMinimalFramesDB.targetFrameIconXOffset) end
+        if rightSection.targetIconYSlider and rightSection.targetIconYSlider.slider then rightSection.targetIconYSlider.slider:SetValue(MattMinimalFramesDB.targetFrameIconYOffset) end
+        if rightSection.targetIconScaleSlider and rightSection.targetIconScaleSlider.slider then rightSection.targetIconScaleSlider.slider:SetValue(MattMinimalFramesDB.targetFrameIconScale) end
         if MMF_UpdateFrameIconPlacement then
             MMF_UpdateFrameIconPlacement("target")
         end
+        RefreshIconResetButtons()
     end)
+
+    RefreshIconResetButtons()
 
     rightSection.targetMarkersCheck = CreateMinimalCheckbox(unitFramesCol, "Target Markers", RIGHT_COL_X, (-690 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "showTargetMarkers", false, function(checked)
         if MMF_UpdateTargetMarkerVisibility then

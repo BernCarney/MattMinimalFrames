@@ -199,6 +199,9 @@ function MMF_CreateMinimalColorPicker(parent, config)
         local getColor = config and config.getColor
         if type(getColor) ~= "function" then
             ApplySwatchColor(1, 1, 1)
+            if container.RefreshResetVisibility then
+                container.RefreshResetVisibility()
+            end
             return
         end
         local ok, r, g, b = pcall(getColor)
@@ -206,6 +209,28 @@ function MMF_CreateMinimalColorPicker(parent, config)
             ApplySwatchColor(r, g, b)
         else
             ApplySwatchColor(1, 1, 1)
+        end
+        if container.RefreshResetVisibility then
+            container.RefreshResetVisibility()
+        end
+    end
+
+    local function IsResetStateDefault()
+        if not hasReset then
+            return true
+        end
+        if config and type(config.isDefault) == "function" then
+            local ok, result = pcall(config.isDefault)
+            if ok then
+                return result == true
+            end
+        end
+        return false
+    end
+
+    local function RefreshResetVisibility()
+        if resetButton then
+            resetButton:SetShown(not IsResetStateDefault())
         end
     end
 
@@ -254,15 +279,17 @@ function MMF_CreateMinimalColorPicker(parent, config)
                 config.onReset()
             end
             RefreshFromProvider()
+            RefreshResetVisibility()
         end)
     end
 
     RefreshFromProvider()
+    RefreshResetVisibility()
 
     container.RefreshColor = RefreshFromProvider
     container.SetColor = ApplySwatchColor
     container.swatchButton = swatchButton
     container.resetButton = resetButton
+    container.RefreshResetVisibility = RefreshResetVisibility
     return container
 end
-

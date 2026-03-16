@@ -70,10 +70,10 @@ local function MMF_SetupAurasPowerHeader(leftCol, accentColor, requestScrollRefr
 
     -- Match Unit Frames visual footprint so both pages feel consistent.
     local FIXED_VIEWPORT_W = 560
-    local FIXED_VIEWPORT_H = 500
+    local FIXED_VIEWPORT_H = 560
     local FIXED_CARD_W = 596
-    local FIXED_CARD_H = 562
-    local FIXED_PAGE_H = 662
+    local FIXED_CARD_H = 622
+    local FIXED_PAGE_H = 722
 
     sectionCard:SetSize(FIXED_CARD_W, FIXED_CARD_H)
     leftCol:SetHeight(FIXED_PAGE_H)

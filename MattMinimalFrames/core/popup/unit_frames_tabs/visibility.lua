@@ -12,11 +12,11 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
     local LEFT_BUTTON_WIDTH = ctx.leftButtonWidth
 
     local visibilityTitleY = -396
-    local nameUnitDropdownY = -414
-    local hideNameCheckboxY = -440
-    local hpUnitDropdownY = -462
-    local hideHPCheckboxY = -488
-    local hideBossCheckboxY = -512
+    local nameUnitDropdownY = -418
+    local hideNameCheckboxY = -448
+    local hpUnitDropdownY = -484
+    local hideHPCheckboxY = -514
+    local hideBossCheckboxY = -548
 
     local textVisibilityTitle = unitFramesCol:CreateFontString(nil, "OVERLAY")
     textVisibilityTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
@@ -96,6 +96,9 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
         local key = prefix .. "HideNameText"
         hideNameTextCheckbox.checkbox:SetChecked(MattMinimalFramesDB[key] == true)
         hideNameTextCheckbox.checkbox.check:SetShown(hideNameTextCheckbox.checkbox:GetChecked())
+        if hideNameTextCheckbox.RefreshResetVisibility then
+            hideNameTextCheckbox:RefreshResetVisibility()
+        end
     end
 
     local function SetHideHPCheckboxFromDB()
@@ -104,12 +107,16 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
         local key = prefix .. "HideHPText"
         hideHPTextCheckbox.checkbox:SetChecked(MattMinimalFramesDB[key] == true)
         hideHPTextCheckbox.checkbox.check:SetShown(hideHPTextCheckbox.checkbox:GetChecked())
+        if hideHPTextCheckbox.RefreshResetVisibility then
+            hideHPTextCheckbox:RefreshResetVisibility()
+        end
     end
 
     EnsureValidTextHideUnits()
 
     local hideNameUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "textHideNameUnit",
         x = LEFT_COL_X,
         y = nameUnitDropdownY,
         width = LEFT_COL_WIDTH,
@@ -135,12 +142,51 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
         MattMinimalFramesDB[prefix .. "HideNameText"] = checked and true or false
         MattMinimalFramesDB.__tempHideNameText = nil
         ApplyTextVisibilityForUnit(unit)
-    end)
+    end, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textHideNameUnit or "player"
+            local prefix = GetUnitPrefix(unit)
+            local key = prefix .. "HideNameText"
+            local defaultValue = d[key]
+            if defaultValue == nil then
+                defaultValue = false
+            end
+            local currentValue = db[key]
+            if currentValue == nil then
+                currentValue = defaultValue
+            end
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textHideNameUnit or "player"
+            local prefix = GetUnitPrefix(unit)
+            local key = prefix .. "HideNameText"
+            local defaultValue = d[key]
+            if defaultValue == nil then
+                defaultValue = false
+            end
+            db[key] = defaultValue and true or false
+            db.__tempHideNameText = nil
+            if hideNameTextCheckbox and hideNameTextCheckbox.checkbox then
+                hideNameTextCheckbox.checkbox:SetChecked(db[key] == true)
+                hideNameTextCheckbox.checkbox.check:SetShown(hideNameTextCheckbox.checkbox:GetChecked())
+            end
+            ApplyTextVisibilityForUnit(unit)
+        end,
+    })
     MattMinimalFramesDB.__tempHideNameText = nil
     SetHideNameCheckboxFromDB()
 
     local hideHPUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "textHideHPUnit",
         x = LEFT_COL_X,
         y = hpUnitDropdownY,
         width = LEFT_COL_WIDTH,
@@ -166,7 +212,45 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
         MattMinimalFramesDB[prefix .. "HideHPText"] = checked and true or false
         MattMinimalFramesDB.__tempHideHPText = nil
         ApplyTextVisibilityForUnit(unit)
-    end)
+    end, {
+        isDefault = function()
+            local db = MattMinimalFramesDB or {}
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textHideHPUnit or "player"
+            local prefix = GetUnitPrefix(unit)
+            local key = prefix .. "HideHPText"
+            local defaultValue = d[key]
+            if defaultValue == nil then
+                defaultValue = false
+            end
+            local currentValue = db[key]
+            if currentValue == nil then
+                currentValue = defaultValue
+            end
+            return currentValue == defaultValue
+        end,
+        onReset = function()
+            if not MattMinimalFramesDB then
+                MattMinimalFramesDB = {}
+            end
+            local db = MattMinimalFramesDB
+            local d = MattMinimalFrames_Defaults or {}
+            local unit = db.textHideHPUnit or "player"
+            local prefix = GetUnitPrefix(unit)
+            local key = prefix .. "HideHPText"
+            local defaultValue = d[key]
+            if defaultValue == nil then
+                defaultValue = false
+            end
+            db[key] = defaultValue and true or false
+            db.__tempHideHPText = nil
+            if hideHPTextCheckbox and hideHPTextCheckbox.checkbox then
+                hideHPTextCheckbox.checkbox:SetChecked(db[key] == true)
+                hideHPTextCheckbox.checkbox.check:SetShown(hideHPTextCheckbox.checkbox:GetChecked())
+            end
+            ApplyTextVisibilityForUnit(unit)
+        end,
+    })
     MattMinimalFramesDB.__tempHideHPText = nil
     SetHideHPCheckboxFromDB()
 
@@ -176,4 +260,3 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
         end
     end)
 end
-

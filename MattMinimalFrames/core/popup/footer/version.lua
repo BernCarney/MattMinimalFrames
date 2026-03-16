@@ -1,3 +1,3 @@
 function MMF_GetPopupFooterVersionText()
-    return "v.7.0.5"
+    return "v.7.1.0"
 end

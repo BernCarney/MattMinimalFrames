@@ -64,6 +64,7 @@ function MMF_BuildUnitFramesOffsetsSection(ctx)
 
     local nameUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "textOffsetNameUnit",
         x = LEFT_COL_X,
         y = -434 + LEFT_LOWER_Y_OFFSET,
         width = LEFT_COL_WIDTH,
@@ -113,6 +114,7 @@ function MMF_BuildUnitFramesOffsetsSection(ctx)
 
     local hpUnitDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
         accentColor = ACCENT_COLOR,
+        settingKey = "textOffsetHPUnit",
         x = LEFT_COL_X,
         y = -514 + LEFT_LOWER_Y_OFFSET,
         width = LEFT_COL_WIDTH,
