@@ -152,7 +152,7 @@ function MMF_CreateMinimalColorPicker(parent, config)
     swatch:SetPoint("LEFT", 6, 0)
     swatch:SetColorTexture(1, 1, 1, 1)
 
-    local swatchBorder = swatchButton:CreateTexture(nil, "OVERLAY")
+    local swatchBorder = swatchButton:CreateTexture(nil, "BACKGROUND")
     swatchBorder:SetPoint("TOPLEFT", swatch, "TOPLEFT", -1, 1)
     swatchBorder:SetPoint("BOTTOMRIGHT", swatch, "BOTTOMRIGHT", 1, -1)
     swatchBorder:SetColorTexture(0, 0, 0, 1)

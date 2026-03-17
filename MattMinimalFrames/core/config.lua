@@ -501,6 +501,13 @@ function MMF_SetGlobalFont(fontName)
 end
 
 function MMF_Config.GetCastBarColor(key)
+    if key == "custom" then
+        local db = MattMinimalFramesDB or {}
+        local d = MattMinimalFrames_Defaults or {}
+        return tonumber(db.castBarCustomColorR) or tonumber(d.castBarCustomColorR) or 1,
+            tonumber(db.castBarCustomColorG) or tonumber(d.castBarCustomColorG) or 1,
+            tonumber(db.castBarCustomColorB) or tonumber(d.castBarCustomColorB) or 0
+    end
     for _, opt in ipairs(MMF_Config.CAST_BAR_COLORS) do
         if opt.value == key then
             return opt.r, opt.g, opt.b

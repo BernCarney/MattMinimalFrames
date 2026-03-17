@@ -1,9 +1,8 @@
 function MMF_BuildUnitFramesCastBarsSection(ctx)
     local unitFramesCol = ctx.parent
-    local popup = ctx.popup
     local ACCENT_COLOR = ctx.accentColor
     local CreateMinimalCheckbox = ctx.createMinimalCheckbox
-    local dropdownLists = ctx.dropdownLists
+    local CreateMinimalColorPicker = ctx.createMinimalColorPicker or MMF_CreateMinimalColorPicker
 
     local MIDDLE_COL_X = ctx.middleColX
     local MIDDLE_COL_WIDTH = ctx.middleColWidth
@@ -11,6 +10,19 @@ function MMF_BuildUnitFramesCastBarsSection(ctx)
     local MIDDLE_BUTTON_OFFSET = ctx.middleButtonOffset
     local MIDDLE_BUTTON_WIDTH = ctx.middleButtonWidth
     local RIGHT_COL_Y_OFFSET = ctx.rightColYOffset
+    local function RefreshCastBars()
+        if MMF_RequestAllFramesUpdate then
+            MMF_RequestAllFramesUpdate()
+            return
+        end
+        if MMF_GetAllFrames and MMF_UpdateUnitFrame then
+            for _, frame in ipairs(MMF_GetAllFrames()) do
+                if frame and (frame.unit == "player" or frame.unit == "target" or frame.unit == "focus") then
+                    MMF_UpdateUnitFrame(frame)
+                end
+            end
+        end
+    end
 
     local castBarsTitle = unitFramesCol:CreateFontString(nil, "OVERLAY")
     castBarsTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
@@ -37,27 +49,55 @@ function MMF_BuildUnitFramesCastBarsSection(ctx)
         StaticPopup_Show("MMF_RELOADUI")
     end)
 
-    local castBarColorDropdown = MMF_CreateMinimalDropdown(unitFramesCol, popup, {
-        accentColor = ACCENT_COLOR,
-        settingKey = "castBarColor",
-        x = MIDDLE_COL_X,
-        y = -260 + RIGHT_COL_Y_OFFSET,
-        width = MIDDLE_COL_WIDTH,
-        labelWidth = MIDDLE_LABEL_WIDTH,
-        buttonOffset = MIDDLE_BUTTON_OFFSET,
-        buttonWidth = MIDDLE_BUTTON_WIDTH,
-        visibleRows = #MMF_Config.CAST_BAR_COLORS,
-        label = "Cast Bar Color",
-        options = MMF_Config.CAST_BAR_COLORS,
-        getValue = function()
-            return (MattMinimalFramesDB and MattMinimalFramesDB.castBarColor) or "yellow"
-        end,
-        onSelect = function(value)
-            if not MattMinimalFramesDB then MattMinimalFramesDB = {} end
-            MattMinimalFramesDB.castBarColor = value
-            StaticPopup_Show("MMF_RELOADUI")
-        end,
-    })
-    dropdownLists.castBarColorList = castBarColorDropdown.list
+    if CreateMinimalColorPicker then
+        CreateMinimalColorPicker(unitFramesCol, {
+            accentColor = ACCENT_COLOR,
+            x = MIDDLE_COL_X,
+            y = -260 + RIGHT_COL_Y_OFFSET,
+            width = MIDDLE_COL_WIDTH,
+            height = 24,
+            labelWidth = MIDDLE_LABEL_WIDTH,
+            buttonOffset = MIDDLE_BUTTON_OFFSET,
+            buttonWidth = MIDDLE_BUTTON_WIDTH,
+            label = "Cast Bar Color",
+            resetLabel = "RESET",
+            getColor = function()
+                local key = (MattMinimalFramesDB and MattMinimalFramesDB.castBarColor)
+                    or (MattMinimalFrames_Defaults and MattMinimalFrames_Defaults.castBarColor)
+                    or "yellow"
+                local r, g, b = MMF_Config.GetCastBarColor(key)
+                return r, g, b
+            end,
+            onColorChanged = function(r, g, b)
+                if not MattMinimalFramesDB then MattMinimalFramesDB = {} end
+                MattMinimalFramesDB.castBarColor = "custom"
+                MattMinimalFramesDB.castBarCustomColorR = r
+                MattMinimalFramesDB.castBarCustomColorG = g
+                MattMinimalFramesDB.castBarCustomColorB = b
+                RefreshCastBars()
+            end,
+            onReset = function()
+                if not MattMinimalFramesDB then MattMinimalFramesDB = {} end
+                local d = MattMinimalFrames_Defaults or {}
+                MattMinimalFramesDB.castBarColor = d.castBarColor or "yellow"
+                MattMinimalFramesDB.castBarCustomColorR = d.castBarCustomColorR or 1.0
+                MattMinimalFramesDB.castBarCustomColorG = d.castBarCustomColorG or 1.0
+                MattMinimalFramesDB.castBarCustomColorB = d.castBarCustomColorB or 0.0
+                RefreshCastBars()
+            end,
+            isDefault = function()
+                local db = MattMinimalFramesDB or {}
+                local d = MattMinimalFrames_Defaults or {}
+                local function NearlyEqual(a, b)
+                    return math.abs((tonumber(a) or 0) - (tonumber(b) or 0)) < 0.0001
+                end
+                return (db.castBarColor or d.castBarColor or "yellow") == (d.castBarColor or "yellow")
+                    and NearlyEqual(db.castBarCustomColorR or d.castBarCustomColorR or 1.0, d.castBarCustomColorR or 1.0)
+                    and NearlyEqual(db.castBarCustomColorG or d.castBarCustomColorG or 1.0, d.castBarCustomColorG or 1.0)
+                    and NearlyEqual(db.castBarCustomColorB or d.castBarCustomColorB or 0.0, d.castBarCustomColorB or 0.0)
+            end,
+        })
+    end
+
 end
 

@@ -353,6 +353,7 @@ function MMF_CreateUnitFramesSection(unitFramesCol, popup, accentColor, createMi
                 popup = popup,
                 accentColor = ACCENT_COLOR,
                 createMinimalCheckbox = CreateMinimalCheckbox,
+                createMinimalColorPicker = MMF_CreateMinimalColorPicker,
                 dropdownLists = dropdownLists,
                 middleColX = MIDDLE_COL_X,
                 middleColWidth = MIDDLE_COL_WIDTH,

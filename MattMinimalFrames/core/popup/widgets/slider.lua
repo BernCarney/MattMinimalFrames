@@ -22,7 +22,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     local hasDefault = (type(settingKey) == "string" and defaults and defaults[settingKey] ~= nil)
         or (customReset and (type(customReset.onReset) == "function" or type(customReset.isDefault) == "function"))
     local resetWidth = hasDefault and 52 or 0
-    local controlRightPadding = hasDefault and (resetWidth + 4) or 0
+    local valueBoxWidth = 40
 
     local container = CreateFrame("Frame", nil, parent)
     container:SetSize(width, 24)
@@ -37,8 +37,8 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     text:SetJustifyH("LEFT")
 
     local valueBg = CreateFrame("Frame", nil, container, "BackdropTemplate")
-    valueBg:SetSize(40, 18)
-    valueBg:SetPoint("RIGHT", -controlRightPadding, 0)
+    valueBg:SetSize(valueBoxWidth, 18)
+    valueBg:SetPoint("RIGHT", 0, 0)
     valueBg:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
     valueBg:SetBackdropColor(0.06, 0.06, 0.08, 1)
     valueBg:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
@@ -52,7 +52,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     valueText:SetTextColor(accent[1], accent[2], accent[3])
     valueText:SetHitRectInsets(0, 0, 0, 0)
 
-    local sliderWidth = math.max(30, width - 155 - controlRightPadding)
+    local sliderWidth = math.max(30, width - 155)
     local slider = CreateFrame("Slider", nil, container, "BackdropTemplate")
     slider:SetSize(sliderWidth, 8)
     slider:SetPoint("LEFT", 105, 0)
@@ -100,6 +100,28 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
         fill:SetWidth(math.max(1, slider:GetWidth() * pct))
     end
     UpdateFill()
+
+    local function ApplyLayout()
+        local resetPad = hasDefault and (resetWidth + 4) or 0
+        local labelWidth = 95
+        local sliderLeft = labelWidth + 10
+        local sliderRight = valueBoxWidth + resetPad + 6
+        local available = width - sliderLeft - sliderRight
+
+        if available < 30 then
+            labelWidth = math.max(56, labelWidth - (30 - available))
+            sliderLeft = labelWidth + 10
+            available = math.max(30, width - sliderLeft - sliderRight)
+        end
+
+        text:SetWidth(labelWidth)
+        valueBg:ClearAllPoints()
+        valueBg:SetPoint("RIGHT", -resetPad, 0)
+        slider:ClearAllPoints()
+        slider:SetPoint("LEFT", sliderLeft, 0)
+        slider:SetWidth(math.max(30, available))
+        UpdateFill()
+    end
 
     local function formatForDisplay(v)
         if isInteger then
@@ -274,6 +296,7 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     container.valueText = valueText
     container.resetButton = resetButton
     container.RefreshResetVisibility = RefreshResetVisibility
+    ApplyLayout()
     RefreshResetVisibility()
     return container
 end
