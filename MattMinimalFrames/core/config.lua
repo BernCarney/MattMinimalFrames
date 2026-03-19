@@ -916,15 +916,19 @@ local function ApplyFrameTextOffsets(frame)
     end
 
     if frame.hpText then
-        frame.hpText:ClearAllPoints()
-        if frame.unit == "player" then
-            frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 + hpX, -14.5 + hpY)
-        elseif frame.unit == "target" then
-            frame.hpText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 2 + hpX, -14.5 + hpY)
-        elseif frame.unit == "targettarget" or frame.unit == "pet" or frame.unit == "focus" or frame.unit == "boss1" or frame.unit == "boss2" or frame.unit == "boss3" or frame.unit == "boss4" or frame.unit == "boss5" then
-            frame.hpText:SetPoint("BOTTOM", frame, "BOTTOM", 0 + hpX, 0 + hpY)
+        if MMF_ApplyHPTextPosition then
+            MMF_ApplyHPTextPosition(frame, frame.unit)
         else
-            frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3 + hpX, 3 + hpY)
+            frame.hpText:ClearAllPoints()
+            if frame.unit == "player" then
+                frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 + hpX, -14.5 + hpY)
+            elseif frame.unit == "target" then
+                frame.hpText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 2 + hpX, -14.5 + hpY)
+            elseif frame.unit == "targettarget" or frame.unit == "pet" or frame.unit == "focus" or frame.unit == "boss1" or frame.unit == "boss2" or frame.unit == "boss3" or frame.unit == "boss4" or frame.unit == "boss5" then
+                frame.hpText:SetPoint("BOTTOM", frame, "BOTTOM", 0 + hpX, 0 + hpY)
+            else
+                frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3 + hpX, 3 + hpY)
+            end
         end
     end
 end

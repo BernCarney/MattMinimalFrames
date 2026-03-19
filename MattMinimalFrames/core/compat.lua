@@ -108,6 +108,41 @@ MMF.HarmSpells = MMF.IsClassicEra and MMF.HarmSpells_TBC or MMF.HarmSpells_Retai
 
 MMF.HasRetailAuraAPI = (C_UnitAuras ~= nil) and not MMF.IsTBC
 
+local function CloneAuraData(aura, index)
+    if type(aura) ~= "table" then
+        return nil
+    end
+
+    -- C_UnitAuras aura tables can be pooled/reused internally.
+    -- Copy fields we rely on so each entry remains stable for the current update pass.
+    return {
+        name = aura.name,
+        icon = aura.icon,
+        count = aura.count,
+        applications = aura.applications,
+        debuffType = aura.debuffType,
+        dispelName = aura.dispelName,
+        duration = aura.duration,
+        expirationTime = aura.expirationTime,
+        sourceUnit = aura.sourceUnit,
+        source = aura.source,
+        caster = aura.caster,
+        isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
+        isFromPlayerOrPet = aura.isFromPlayerOrPet,
+        castByPlayer = aura.castByPlayer,
+        isPlayerAura = aura.isPlayerAura,
+        isStealable = aura.isStealable,
+        canApplyAura = aura.canApplyAura,
+        isBossAura = aura.isBossAura,
+        isHelpful = aura.isHelpful,
+        isHarmful = aura.isHarmful,
+        isNameplateOnly = aura.isNameplateOnly,
+        spellId = aura.spellId,
+        auraInstanceID = aura.auraInstanceID,
+        _index = index or aura._index,
+    }
+end
+
 function MMF.GetUnitAuras(unit, filter)
     local auras = {}
     local isHelpful = (filter == "HELPFUL")
@@ -120,8 +155,10 @@ function MMF.GetUnitAuras(unit, filter)
                 if not aura then
                     break
                 end
-                aura._index = i
-                table.insert(auras, aura)
+                local auraCopy = CloneAuraData(aura, i)
+                if auraCopy then
+                    table.insert(auras, auraCopy)
+                end
             end
         else
             local GetAuraSlots = C_UnitAuras.GetAuraSlots
@@ -133,7 +170,10 @@ function MMF.GetUnitAuras(unit, filter)
                 for _, slot in ipairs(slots) do
                     local aura = GetAuraDataBySlot(unit, slot)
                     if aura then
-                        table.insert(auras, aura)
+                        local auraCopy = CloneAuraData(aura)
+                        if auraCopy then
+                            table.insert(auras, auraCopy)
+                        end
                     end
                 end
             until not token

@@ -57,6 +57,8 @@ function MMF_ResetPopupScaleAndTextToDefaults()
         MattMinimalFramesDB.showHPValueText = d.showHPValueText
         MattMinimalFramesDB.showHPPercentText = d.showHPPercentText
         MattMinimalFramesDB.hpTextUseShortValue = d.hpTextUseShortValue
+        MattMinimalFramesDB.colorPlayerNameTextByClass = d.colorPlayerNameTextByClass == true
+        MattMinimalFramesDB.colorNPCNameTextByReaction = d.colorNPCNameTextByReaction == true
         -- Power bar size
         MattMinimalFramesDB.showPlayerPowerBar = d.showPlayerPowerBar
         MattMinimalFramesDB.showTargetPowerBar = d.showTargetPowerBar
@@ -68,6 +70,7 @@ function MMF_ResetPopupScaleAndTextToDefaults()
         MattMinimalFramesDB.colorPlayerPowerTextByResource = d.colorPlayerPowerTextByResource
         MattMinimalFramesDB.colorTargetPowerTextByResource = d.colorTargetPowerTextByResource
         MattMinimalFramesDB.playerBarColorMode = d.playerBarColorMode or "class"
+        MattMinimalFramesDB.useHealthGradientColor = d.useHealthGradientColor == true
         MattMinimalFramesDB.targetBarColorMode = d.targetBarColorMode or "default"
         MattMinimalFramesDB.totBarColorMode = d.totBarColorMode or "default"
         MattMinimalFramesDB.focusBarColorMode = d.focusBarColorMode or "default"
@@ -101,6 +104,7 @@ function MMF_ResetPopupScaleAndTextToDefaults()
         MattMinimalFramesDB.powerBarHorizontalOffset = d.powerBarHorizontalOffset or 4
         MattMinimalFramesDB.powerBarPositions = nil
         MattMinimalFramesDB.powerTextPositions = nil
+        MattMinimalFramesDB.hpTextPositions = nil
         MattMinimalFramesDB.castBarPositions = nil
         MattMinimalFramesDB.powerBarSizeUnit = "player"
         if MMF_UpdatePowerBarVisibility then

@@ -71,8 +71,17 @@ end
 MMF_UpdateBlizzardPlayerCastBarVisibility = UpdateBlizzardPlayerCastBarVisibility
 
 local trackedPartyRaidNameStyles = setmetatable({}, { __mode = "k" })
-local compactPartyRaidNameHookInstalled = false
-local compactPartyRaidLabelHookInstalled = false
+local compactPartyRaidNameHookState = {
+    compactUnitFrameUpdateName = false,
+    partyMemberUpdateMember = false,
+    partyMemberUpdateNameTextAnchors = false,
+}
+local compactPartyRaidLabelHookState = {
+    raidGroupInitialize = false,
+    raidGroupLayout = false,
+    partyGenerate = false,
+    raidContainerLayout = false,
+}
 
 local function IsFontString(region)
     return region and region.GetObjectType and region:GetObjectType() == "FontString"
@@ -138,13 +147,29 @@ local function IsBlizzardNonRaidPartyMemberFrame(frame)
     if not frame then
         return false
     end
-    local unitToken = frame.unitToken
+    local unitToken = frame.unit or frame.displayedUnit or frame.unitToken
     if type(unitToken) == "string" and unitToken:match("^party%d+$") then
         return true
     end
     local frameName = SafeGetName(frame)
-    if type(frameName) == "string" and frameName:match("^PartyMemberFrame%d+$") then
-        return true
+    if type(frameName) == "string" then
+        if frameName:match("^PartyMemberFrame%d+$") or frameName:match("^PartyFrameMemberFrame%d+$") then
+            return true
+        end
+    end
+    local parent = frame
+    for _ = 1, 8 do
+        parent = SafeGetParent(parent)
+        if not parent then
+            break
+        end
+        if parent == _G.PartyFrame then
+            return true
+        end
+        local parentName = SafeGetName(parent)
+        if type(parentName) == "string" and parentName:match("^PartyFrame") then
+            return true
+        end
     end
     return false
 end
@@ -173,6 +198,27 @@ local function IsBlizzardCompactRaidMemberFrame(frame)
         end
     end
     return false
+end
+
+local function IsPartyRaidMemberUnitToken(unitToken)
+    if type(unitToken) ~= "string" then
+        return false
+    end
+    return unitToken:match("^party%d+$") ~= nil
+        or unitToken:match("^raid%d+$") ~= nil
+        or unitToken == "player"
+        or unitToken == "vehicle"
+end
+
+local function IsStylablePartyRaidNameFrame(frame)
+    if IsBlizzardNonRaidPartyMemberFrame(frame) then
+        return true
+    end
+    if not IsBlizzardPartyRaidUnitFrame(frame) then
+        return false
+    end
+    local unitToken = frame and (frame.unit or frame.displayedUnit or frame.unitToken) or nil
+    return IsPartyRaidMemberUnitToken(unitToken)
 end
 
 local function IsPartyRaidNameStylingEnabled()
@@ -227,37 +273,36 @@ local function ApplyPartyRaidLabelVisibilityToAllFrames()
 end
 
 local function EnsurePartyRaidLabelHook()
-    if compactPartyRaidLabelHookInstalled then
-        return
-    end
     if type(hooksecurefunc) ~= "function" then
         return
     end
 
-    if type(_G.CompactRaidGroup_InitializeForGroup) == "function" then
+    if not compactPartyRaidLabelHookState.raidGroupInitialize and type(_G.CompactRaidGroup_InitializeForGroup) == "function" then
         hooksecurefunc("CompactRaidGroup_InitializeForGroup", function(frame)
             ApplyPartyRaidLabelVisibilityForFrame(frame)
         end)
+        compactPartyRaidLabelHookState.raidGroupInitialize = true
     end
-    if type(_G.CompactRaidGroup_UpdateLayout) == "function" then
+    if not compactPartyRaidLabelHookState.raidGroupLayout and type(_G.CompactRaidGroup_UpdateLayout) == "function" then
         hooksecurefunc("CompactRaidGroup_UpdateLayout", function(frame)
             ApplyPartyRaidLabelVisibilityForFrame(frame)
         end)
+        compactPartyRaidLabelHookState.raidGroupLayout = true
     end
-    if type(_G.CompactPartyFrame_Generate) == "function" then
+    if not compactPartyRaidLabelHookState.partyGenerate and type(_G.CompactPartyFrame_Generate) == "function" then
         hooksecurefunc("CompactPartyFrame_Generate", function()
             if _G.CompactPartyFrame then
                 ApplyPartyRaidLabelVisibilityForFrame(_G.CompactPartyFrame)
             end
         end)
+        compactPartyRaidLabelHookState.partyGenerate = true
     end
-    if type(_G.CompactRaidFrameContainer_LayoutFrames) == "function" then
+    if not compactPartyRaidLabelHookState.raidContainerLayout and type(_G.CompactRaidFrameContainer_LayoutFrames) == "function" then
         hooksecurefunc("CompactRaidFrameContainer_LayoutFrames", function()
             ApplyPartyRaidLabelVisibilityToAllFrames()
         end)
+        compactPartyRaidLabelHookState.raidContainerLayout = true
     end
-
-    compactPartyRaidLabelHookInstalled = true
 end
 
 local function CapturePartyRaidNameStyle(fontString)
@@ -478,23 +523,13 @@ local function ApplyRaidNameTruncation(fontString, frame)
     if not IsFontString(fontString) then
         return
     end
-    if not IsBlizzardCompactRaidMemberFrame(frame) and not IsBlizzardPartyRaidUnitFrame(frame) and not IsBlizzardNonRaidPartyMemberFrame(frame) then
+    if not IsStylablePartyRaidNameFrame(frame) then
         return
     end
 
     local truncateLen = GetPartyRaidNameTruncateLength(frame)
 
-    local unitToken = frame and (frame.unit or frame.displayedUnit or frame.unitToken) or nil
-    local fullName = nil
-    if type(unitToken) == "string" and UnitExists and UnitExists(unitToken) and UnitName then
-        local unitName = UnitName(unitToken)
-        if type(unitName) == "string" and unitName ~= "" then
-            fullName = unitName
-        end
-    end
-    if not fullName or fullName == "" then
-        fullName = fontString.GetText and fontString:GetText() or nil
-    end
+    local fullName = fontString.GetText and fontString:GetText() or nil
     if type(fullName) ~= "string" or fullName == "" then
         return
     end
@@ -531,7 +566,6 @@ local function ApplyPartyRaidNameStyleForFontString(fontString, frame)
     if MattMinimalFramesDB
         and MattMinimalFramesDB.useSharedPartyRaidNameFont == true
         and MattMinimalFramesDB.centerPartyRaidNames == true
-        and not IsBlizzardNonRaidPartyMemberFrame(frame)
     then
         ApplyPartyRaidNameCenter(fontString, frame)
     elseif original then
@@ -543,7 +577,7 @@ local function ApplyPartyRaidNameStyleForFontString(fontString, frame)
 end
 
 local function ApplyPartyRaidNameStyleForFrame(frame)
-    if not IsBlizzardPartyRaidUnitFrame(frame) and not IsBlizzardNonRaidPartyMemberFrame(frame) then
+    if not IsStylablePartyRaidNameFrame(frame) then
         return
     end
 
@@ -600,7 +634,7 @@ function MMF_ApplyPartyRaidNameTruncationPreview()
     end
     local seen = {}
     local function Visit(frame)
-        if not IsBlizzardCompactRaidMemberFrame(frame) and not IsBlizzardPartyRaidUnitFrame(frame) and not IsBlizzardNonRaidPartyMemberFrame(frame) then
+        if not IsStylablePartyRaidNameFrame(frame) then
             return
         end
         if IsFontString(frame.name) then
@@ -642,7 +676,7 @@ end
 function MMF_RefreshBlizzardPartyRaidNameFonts()
     local seen = {}
     local function Visit(frame)
-        if not IsBlizzardPartyRaidUnitFrame(frame) and not IsBlizzardNonRaidPartyMemberFrame(frame) then
+        if not IsStylablePartyRaidNameFrame(frame) then
             return
         end
         if IsPartyRaidNameStylingEnabled() then
@@ -680,36 +714,35 @@ function MMF_UpdateBlizzardPartyRaidLabels()
 end
 
 local function EnsurePartyRaidNameHook()
-    if compactPartyRaidNameHookInstalled then
-        return
-    end
     if type(hooksecurefunc) ~= "function" then
         return
     end
-    if type(_G.CompactUnitFrame_UpdateName) == "function" then
+    if not compactPartyRaidNameHookState.compactUnitFrameUpdateName and type(_G.CompactUnitFrame_UpdateName) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateName", function(frame)
             if IsPartyRaidNameStylingEnabled() then
                 ApplyPartyRaidNameStyleForFrame(frame)
             end
         end)
+        compactPartyRaidNameHookState.compactUnitFrameUpdateName = true
     end
     if type(_G.PartyMemberFrameMixin) == "table" then
-        if type(_G.PartyMemberFrameMixin.UpdateMember) == "function" then
+        if not compactPartyRaidNameHookState.partyMemberUpdateMember and type(_G.PartyMemberFrameMixin.UpdateMember) == "function" then
             hooksecurefunc(_G.PartyMemberFrameMixin, "UpdateMember", function(self)
                 if IsPartyRaidNameStylingEnabled() then
                     ApplyPartyRaidNameStyleForFrame(self)
                 end
             end)
+            compactPartyRaidNameHookState.partyMemberUpdateMember = true
         end
-        if type(_G.PartyMemberFrameMixin.UpdateNameTextAnchors) == "function" then
+        if not compactPartyRaidNameHookState.partyMemberUpdateNameTextAnchors and type(_G.PartyMemberFrameMixin.UpdateNameTextAnchors) == "function" then
             hooksecurefunc(_G.PartyMemberFrameMixin, "UpdateNameTextAnchors", function(self)
                 if IsPartyRaidNameStylingEnabled() then
                     ApplyPartyRaidNameStyleForFrame(self)
                 end
             end)
+            compactPartyRaidNameHookState.partyMemberUpdateNameTextAnchors = true
         end
     end
-    compactPartyRaidNameHookInstalled = true
 end
 
 function MMF_UpdateBlizzardPartyRaidNameFonts()
@@ -730,6 +763,16 @@ function MMF_UpdateBlizzardPartyRaidNameFonts()
         MMF_UpdateBlizzardPartyRaidLabels()
     end
 end
+
+local partyRaidRefreshEventFrame = CreateFrame("Frame")
+partyRaidRefreshEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+partyRaidRefreshEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+partyRaidRefreshEventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+partyRaidRefreshEventFrame:SetScript("OnEvent", function()
+    if MMF_UpdateBlizzardPartyRaidNameFonts then
+        MMF_UpdateBlizzardPartyRaidNameFonts()
+    end
+end)
 
 
 SLASH_MATTMINIMALFRAMES1 = "/mmf"
@@ -862,6 +905,8 @@ function MMF_ApplyActiveProfileLive()
     if MMF_ApplyAllFrameScales then MMF_ApplyAllFrameScales() end
     ApplyPowerBarPositions()
     if MMF_ApplyPowerTextPositions then MMF_ApplyPowerTextPositions() end
+    if MMF_ApplyHPTextPositions then MMF_ApplyHPTextPositions() end
+    if MMF_ApplyHealthFillDirections then MMF_ApplyHealthFillDirections() end
 
     if MMF_SetPowerBarSize then
         local playerPowerW = MattMinimalFramesDB.playerPowerBarWidth or MattMinimalFramesDB.powerBarWidth or 73
@@ -941,6 +986,9 @@ function MMF_ApplyActiveProfileLive()
         local hidden = MattMinimalFramesDB.minimap and MattMinimalFramesDB.minimap.hide
         MMF_ToggleMinimapButton(not hidden)
     end
+    if MMF_ApplyToolsNoteState then
+        MMF_ApplyToolsNoteState()
+    end
 
     if MattMinimalFramesDB.locked then
         if MMF_LockFrames then MMF_LockFrames() end
@@ -1019,6 +1067,9 @@ local function Initialize()
     end
     if MMF_ApplyGlobalFont then
         MMF_ApplyGlobalFont()
+    end
+    if MMF_ApplyToolsNoteState then
+        MMF_ApplyToolsNoteState()
     end
     if MMF_UpdateTargetMarkers then
         MMF_UpdateTargetMarkers()

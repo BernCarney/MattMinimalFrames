@@ -385,10 +385,10 @@ local function ApplyCastBarPosition(frame, unit)
         scaleX = tonumber(MMF_GetFrameScaleX and MMF_GetFrameScaleX("focus")) or 1.0
         scaleY = tonumber(MMF_GetFrameScaleY and MMF_GetFrameScaleY("focus")) or 1.0
     end
-    if scaleX < 0.5 then scaleX = 0.5 end
-    if scaleX > 3.0 then scaleX = 3.0 end
-    if scaleY < 0.5 then scaleY = 0.5 end
-    if scaleY > 5.0 then scaleY = 5.0 end
+    if scaleX < 0.1 then scaleX = 0.1 end
+    if scaleX > 6.0 then scaleX = 6.0 end
+    if scaleY < 0.1 then scaleY = 0.1 end
+    if scaleY > 10.0 then scaleY = 10.0 end
 
     local baseWidth = math.max(8, (frame.originalWidth or frame:GetWidth() or 0) - 2)
     local width = math.max(8, baseWidth * scaleX)
@@ -800,6 +800,46 @@ local function GetHealthBarBorderStyleFromDB()
         ClampBorderSize(db.healthBarBorderSize, 1)
 end
 
+local function IsHealthFillTopToBottomEnabled()
+    return MattMinimalFramesDB and MattMinimalFramesDB.healthFillTopToBottom == true
+end
+
+local function ApplyHealthFillDirection(frame)
+    if not frame or not frame.healthBar then
+        return
+    end
+
+    local orientation = IsHealthFillTopToBottomEnabled() and "VERTICAL" or "HORIZONTAL"
+
+    if frame.healthBar.SetOrientation then
+        frame.healthBar:SetOrientation(orientation)
+    end
+    if frame.healthBar.SetReverseFill then
+        frame.healthBar:SetReverseFill(false)
+    end
+
+    if frame.myHealPrediction and frame.myHealPrediction.SetOrientation then
+        frame.myHealPrediction:SetOrientation(orientation)
+        if frame.myHealPrediction.SetReverseFill then
+            frame.myHealPrediction:SetReverseFill(false)
+        end
+    end
+
+    if frame.otherHealPrediction and frame.otherHealPrediction.SetOrientation then
+        frame.otherHealPrediction:SetOrientation(orientation)
+        if frame.otherHealPrediction.SetReverseFill then
+            frame.otherHealPrediction:SetReverseFill(false)
+        end
+    end
+
+    if frame.absorbBar and frame.absorbBar.SetOrientation then
+        frame.absorbBar:SetOrientation(orientation)
+        if frame.absorbBar.SetReverseFill then
+            frame.absorbBar:SetReverseFill(false)
+        end
+    end
+end
+
 local function CreateHealthBar(frame)
     frame.healthBarBG = frame:CreateTexture(nil, "BACKGROUND")
     local borderR, borderG, borderB, borderA, borderSize = GetHealthBarBorderStyleFromDB()
@@ -856,6 +896,7 @@ local function CreateHealthBar(frame)
     frame.healthBar:SetMinMaxValues(0, 1)
     frame.healthBar:SetValue(1)
     frame.healthBarFG = frame.healthBar:GetStatusBarTexture()
+    ApplyHealthFillDirection(frame)
 
     frame.dispelOverlay = CreateFrame("Frame", nil, frame.healthBar)
     frame.dispelOverlay:SetAllPoints(frame)
@@ -1004,6 +1045,119 @@ local function ApplyPowerTextPosition(frame, unit)
     frame.powerText:SetPoint(point, relFrame, relPoint, x, y)
 end
 
+local function GetDefaultHPTextAnchor(frame, unit)
+    local hpX = MMF_GetHPTextXOffset and MMF_GetHPTextXOffset(unit) or 0
+    local hpY = MMF_GetHPTextYOffset and MMF_GetHPTextYOffset(unit) or 0
+
+    if unit == "player" then
+        return "BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 + hpX, -14.5 + hpY
+    elseif unit == "target" then
+        return "BOTTOMLEFT", frame, "BOTTOMLEFT", 2 + hpX, -14.5 + hpY
+    elseif unit == "targettarget"
+        or unit == "pet"
+        or unit == "focus"
+        or unit == "boss1"
+        or unit == "boss2"
+        or unit == "boss3"
+        or unit == "boss4"
+        or unit == "boss5"
+    then
+        return "BOTTOM", frame, "BOTTOM", 0 + hpX, 0 + hpY
+    end
+    return "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3 + hpX, 3 + hpY
+end
+
+local function GetHPTextAttachPoint(unit)
+    if unit == "player" then
+        return "BOTTOMRIGHT"
+    elseif unit == "target" then
+        return "BOTTOMLEFT"
+    elseif unit == "targettarget"
+        or unit == "pet"
+        or unit == "focus"
+        or unit == "boss1"
+        or unit == "boss2"
+        or unit == "boss3"
+        or unit == "boss4"
+        or unit == "boss5"
+    then
+        return "BOTTOM"
+    end
+    return "BOTTOMRIGHT"
+end
+
+local function ConvertLegacyHPTextPositionToEdge(frame, unit, centerX, centerY)
+    local frameWidth = frame:GetWidth() or frame.originalWidth or 0
+    local frameHeight = frame:GetHeight() or frame.originalHeight or 0
+    local edgeX = centerX
+    if unit == "player" then
+        edgeX = centerX - (frameWidth * 0.5)
+    else
+        edgeX = centerX + (frameWidth * 0.5)
+    end
+    local edgeY = centerY + (frameHeight * 0.5)
+    return edgeX, edgeY
+end
+
+local function GetStoredHPTextEdgePosition(frame, unit)
+    local store = MattMinimalFramesDB and MattMinimalFramesDB.hpTextPositions
+    local pos = store and store[unit]
+    if type(pos) ~= "table" then
+        return nil, nil
+    end
+
+    local x = tonumber(pos.x)
+    local y = tonumber(pos.y)
+    if type(x) ~= "number" or type(y) ~= "number" then
+        return nil, nil
+    end
+
+    if pos.mode == "edge" then
+        return x, y
+    end
+
+    local edgeX, edgeY = ConvertLegacyHPTextPositionToEdge(frame, unit, x, y)
+    pos.mode = "edge"
+    pos.x = edgeX
+    pos.y = edgeY
+    return edgeX, edgeY
+end
+
+local function ApplyHPTextPosition(frame, unit)
+    if not frame or not frame.hpText then return end
+
+    if frame.hpTextDragFrame and (unit == "player" or unit == "target") then
+        frame.hpTextDragFrame:ClearAllPoints()
+        local attach = GetHPTextAttachPoint(unit)
+        local edgeX, edgeY = GetStoredHPTextEdgePosition(frame, unit)
+        if type(edgeX) == "number" and type(edgeY) == "number" then
+            frame.hpTextDragFrame:SetPoint(attach, frame, attach, edgeX, edgeY)
+        else
+            local point, relFrame, relPoint, x, y = GetDefaultHPTextAnchor(frame, unit)
+            frame.hpTextDragFrame:SetPoint(point, relFrame, relPoint, x, y)
+        end
+
+        frame.hpText:ClearAllPoints()
+        frame.hpText:SetPoint(attach, frame.hpTextDragFrame, attach, 0, 0)
+        return
+    end
+
+    local point, relFrame, relPoint, x, y = GetDefaultHPTextAnchor(frame, unit)
+    frame.hpText:ClearAllPoints()
+    frame.hpText:SetPoint(point, relFrame, relPoint, x, y)
+end
+
+MMF_ApplyHPTextPosition = ApplyHPTextPosition
+
+function MMF_ApplyHealthFillDirections()
+    if not MMF_GetAllFrames then
+        return
+    end
+    for _, frame in ipairs(MMF_GetAllFrames()) do
+        ApplyHealthFillDirection(frame)
+    end
+end
+
 --------------------------------------------------
 -- ABSORB BAR CREATION
 --------------------------------------------------
@@ -1037,6 +1191,7 @@ local function CreateAbsorbBar(frame)
     end
 
     frame.absorbBar:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
+    ApplyHealthFillDirection(frame)
     frame.absorbBar:Hide()
 end
 
@@ -1063,6 +1218,7 @@ local function CreateHealPredictionBar(frame)
     frame.otherHealPrediction:GetStatusBarTexture():SetVertexColor(0, 0.631, 0.557, 0.7)
     frame.otherHealPrediction:SetFrameLevel(frame.healthBar:GetFrameLevel() + 1)
     frame.otherHealPrediction:Hide()
+    ApplyHealthFillDirection(frame)
 
     if Compat.IsRetail and CreateUnitHealPredictionCalculator then
         frame.healPredictionCalculator = CreateUnitHealPredictionCalculator()
@@ -1125,8 +1281,6 @@ end
 local function CreateResourceText(frame, unit)
     local fontPath = cfg.FONT_PATH
     local hpSize = MMF_GetHPTextSize and MMF_GetHPTextSize(unit) or 13
-    local hpX = MMF_GetHPTextXOffset and MMF_GetHPTextXOffset(unit) or 0
-    local hpY = MMF_GetHPTextYOffset and MMF_GetHPTextYOffset(unit) or 0
     
     frame.hpText = frame.nameOverlay:CreateFontString(nil, "OVERLAY")
     if MMF_SetFontSafe then
@@ -1145,6 +1299,70 @@ local function CreateResourceText(frame, unit)
     frame.powerText:SetTextColor(1, 1, 1)
 
     if unit == "player" or unit == "target" then
+        frame.hpTextDragFrame = CreateFrame("Frame", nil, frame.nameOverlay)
+        frame.hpTextDragFrame:SetFrameLevel(frame.nameOverlay:GetFrameLevel() + 1)
+        frame.hpTextDragFrame:SetSize(1, 1)
+        if frame.hpTextDragFrame.SetHitRectInsets then
+            frame.hpTextDragFrame:SetHitRectInsets(-42, -42, -9, -9)
+        end
+        frame.hpTextDragFrame:SetMovable(true)
+        frame.hpTextDragFrame:EnableMouse(true)
+        frame.hpTextDragFrame:RegisterForDrag("LeftButton")
+
+        frame.hpTextDragFrame:SetScript("OnDragStart", function(self)
+            if CanStartFrameDrag(self) then
+                self:StartMoving()
+            end
+        end)
+
+        frame.hpTextDragFrame:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local left = self:GetLeft()
+            local right = self:GetRight()
+            local bottom = self:GetBottom()
+            local frameLeft = frame:GetLeft()
+            local frameRight = frame:GetRight()
+            local frameBottom = frame:GetBottom()
+            if not left or not right or not bottom or not frameLeft or not frameRight or not frameBottom then
+                return
+            end
+
+            local anchorPoint = GetHPTextAttachPoint(unit)
+            local x
+            if anchorPoint == "BOTTOMRIGHT" then
+                x = right - frameRight
+            else
+                x = left - frameLeft
+            end
+            local y = bottom - frameBottom
+            if not MattMinimalFramesDB then MattMinimalFramesDB = {} end
+            if not MattMinimalFramesDB.hpTextPositions then
+                MattMinimalFramesDB.hpTextPositions = {}
+            end
+            MattMinimalFramesDB.hpTextPositions[unit] = {
+                mode = "edge",
+                x = x,
+                y = y,
+            }
+        end)
+
+        frame.hpTextDragFrame:SetScript("OnEnter", function()
+            GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+            if unit == "player" then
+                GameTooltip:SetText("Player HP Text", 1, 1, 1)
+            else
+                GameTooltip:SetText("Target HP Text", 1, 1, 1)
+            end
+            GameTooltip:AddLine(GetDragHintText(), 0.5, 0.5, 0.5)
+            GameTooltip:Show()
+        end)
+
+        frame.hpTextDragFrame:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        frame.hpTextDragFrame:Hide()
+
         frame.powerTextDragFrame = CreateFrame("Frame", nil, frame.nameOverlay)
         frame.powerTextDragFrame:SetFrameLevel(frame.nameOverlay:GetFrameLevel() + 1)
         frame.powerTextDragFrame:SetSize(84, 18)
@@ -1186,20 +1404,9 @@ local function CreateResourceText(frame, unit)
 
         frame.powerTextDragFrame:Hide()
     end
-    
-    if unit == "player" then
-        frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0 + hpX, -14.5 + hpY)
-        ApplyPowerTextPosition(frame, unit)
-    elseif unit == "target" then
-        frame.hpText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 2 + hpX, -14.5 + hpY)
-        ApplyPowerTextPosition(frame, unit)
-    elseif unit == "targettarget" or unit == "pet" or unit == "focus" or unit == "boss1" or unit == "boss2" or unit == "boss3" or unit == "boss4" or unit == "boss5" then
-        frame.hpText:SetPoint("BOTTOM", frame, "BOTTOM", 0 + hpX, 0 + hpY)
-        ApplyPowerTextPosition(frame, unit)
-    else
-        frame.hpText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3 + hpX, 3 + hpY)
-        ApplyPowerTextPosition(frame, unit)
-    end
+
+    ApplyHPTextPosition(frame, unit)
+    ApplyPowerTextPosition(frame, unit)
 end
 
 function MMF_ApplyPowerTextPositions()
@@ -1210,6 +1417,24 @@ function MMF_ApplyPowerTextPositions()
 
     ApplyFor(_G.MMF_PlayerFrame, "player")
     ApplyFor(_G.MMF_TargetFrame, "target")
+end
+
+function MMF_ApplyHPTextPositions()
+    local function ApplyFor(frame, unit)
+        if not frame or not frame.hpText then return end
+        ApplyHPTextPosition(frame, unit)
+    end
+
+    ApplyFor(_G.MMF_PlayerFrame, "player")
+    ApplyFor(_G.MMF_TargetFrame, "target")
+    ApplyFor(_G.MMF_TargetOfTargetFrame, "targettarget")
+    ApplyFor(_G.MMF_PetFrame, "pet")
+    ApplyFor(_G.MMF_FocusFrame, "focus")
+    ApplyFor(_G.MMF_Boss1Frame, "boss1")
+    ApplyFor(_G.MMF_Boss2Frame, "boss2")
+    ApplyFor(_G.MMF_Boss3Frame, "boss3")
+    ApplyFor(_G.MMF_Boss4Frame, "boss4")
+    ApplyFor(_G.MMF_Boss5Frame, "boss5")
 end
 
 --------------------------------------------------
@@ -2194,6 +2419,9 @@ MMF_CreateSecureUnitFrame = function(...)
         end
         if frame.powerTextDragFrame then
             frame.powerTextDragFrame:Hide()
+        end
+        if frame.hpTextDragFrame then
+            frame.hpTextDragFrame:Hide()
         end
     end
     

@@ -74,12 +74,12 @@ local function MMF_SetupUnitFramesHeader(unitFramesCol, accentColor, createSubTa
 
     local sectionDefs = {
         { label = "Layout", subtitle = "Scale and frame sizing controls.", x = 0, y = 8, width = 560, height = 188, guide = "Use this page to change frame size.\nPick a frame in the dropdown, then adjust Scale X and Scale Y." },
-        { label = "Text", subtitle = "Font sizes, truncation, HP text format, and name behavior.", x = 0, y = 98, width = 288, height = 324, maskTop = 12, guide = "Use this page to change how text looks.\nYou can adjust name text, health text, and text behavior." },
+        { label = "Text", subtitle = "Font sizes, truncation, HP text format, and name behavior.", x = 0, y = 98, width = 288, height = 360, maskTop = 12, guide = "Use this page to change how text looks.\nYou can adjust name text, health text, and text behavior." },
         { label = "Visibility", subtitle = "Choose when name, HP text, and boss frames are shown.", x = 0, y = 410, width = 288, height = 124, guide = "Use this page to show or hide parts of your frames.\nGood for reducing clutter in combat." },
-        { label = "Offsets", subtitle = "Adjust text positions for each supported unit.", x = 0, y = 544, width = 288, height = 174, guide = "Use this page to move text positions.\nGreat for fine-tuning alignment after sizing and text changes." },
+        { label = "Offsets", subtitle = "Adjust text positions for each supported unit.", x = 0, y = 544, width = 288, height = 262, guide = "Use this page to move text positions.\nGreat for fine-tuning alignment after sizing and text changes." },
         { label = "Cast Bars", subtitle = "Cast bar settings.", x = 300, y = 112, width = 288, height = 170, guide = "Use this page to enable cast bars.\nChange cast bar colors to match your UI style." },
         { label = "OOC", subtitle = "Out-of-combat visibility and fade rules.", x = 300, y = 258, width = 288, height = 184, guide = "Use this page to control how frames look out of combat.\nYou can fade frames when they are less important." },
-        { label = "Appearance", subtitle = "Textures, fonts, and frame colors.", x = 588, y = 6, width = 300, height = 480, guide = "Use this page to style your frames.\nChange textures, fonts, and colors to match your UI." },
+        { label = "Appearance", subtitle = "Textures, fonts, and frame colors.", x = 588, y = 6, width = 316, height = 590, guide = "Use this page to style your frames.\nChange textures, fonts, and colors to match your UI." },
         { label = "Icons", subtitle = "Icon positions, sizes, and target markers.", x = 588, y = 236, width = 300, height = 460, guide = "Use this page for class/target icon options.\nUse the bottom options to enable indicators and indicator animations." },
         { label = "Overlays", subtitle = "Heal prediction and absorb overlay settings.", x = 588, y = 512, width = 300, height = 300, guide = "Use this page for heal and absorb overlay visuals.\nSet how strong or subtle those effects should be." },
     }
@@ -291,6 +291,7 @@ function MMF_CreateUnitFramesSection(unitFramesCol, popup, accentColor, createMi
             config = {
                 popup = popup,
                 accentColor = ACCENT_COLOR,
+                createMinimalCheckbox = CreateMinimalCheckbox,
                 createMinimalSlider = CreateMinimalSlider,
                 dropdownLists = dropdownLists,
                 sectionWidth = 560,

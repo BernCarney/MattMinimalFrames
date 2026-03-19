@@ -28,7 +28,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
     textFormatSubtext:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 10, "")
     textFormatSubtext:SetPoint("TOPLEFT", LEFT_COL_X, -318)
     textFormatSubtext:SetTextColor(0.65, 0.65, 0.7)
-    textFormatSubtext:SetText("HP text format options")
+    textFormatSubtext:SetText("HP and name text format options")
 
     if MattMinimalFramesDB.showHPValueText == nil then
         MattMinimalFramesDB.showHPValueText = true
@@ -38,6 +38,12 @@ function MMF_BuildUnitFramesTextSection(ctx)
     end
     if MattMinimalFramesDB.hpTextUseShortValue == nil then
         MattMinimalFramesDB.hpTextUseShortValue = true
+    end
+    if MattMinimalFramesDB.colorPlayerNameTextByClass == nil then
+        MattMinimalFramesDB.colorPlayerNameTextByClass = false
+    end
+    if MattMinimalFramesDB.colorNPCNameTextByReaction == nil then
+        MattMinimalFramesDB.colorNPCNameTextByReaction = false
     end
 
     local hpValueCheckbox
@@ -95,6 +101,13 @@ function MMF_BuildUnitFramesTextSection(ctx)
             end
         end
     end
+
+    CreateMinimalCheckbox(unitFramesCol, "Name Text: Player Class", LEFT_COL_X, -410, "colorPlayerNameTextByClass", false, function()
+        RequestNameTextRefresh()
+    end)
+    CreateMinimalCheckbox(unitFramesCol, "Name Text: NPC Reaction", LEFT_COL_X, -434, "colorNPCNameTextByReaction", false, function()
+        RequestNameTextRefresh()
+    end)
 
     local function GetTextSizePrefix(unit)
         if unit == nil then return "player" end

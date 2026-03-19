@@ -6,6 +6,7 @@ function MMF_BuildUnitFramesMediaSection(ctx)
     local rightSection = ctx.rightSection
     local NormalizeSelectionValue = ctx.normalizeSelectionValue
     local CreateMinimalSlider = ctx.createMinimalSlider or MMF_CreateMinimalSlider
+    local CreateMinimalCheckbox = ctx.createMinimalCheckbox or MMF_CreateMinimalCheckbox
 
     local RIGHT_COL_X = ctx.rightColX
     local RIGHT_COL_WIDTH = ctx.rightColWidth
@@ -226,22 +227,23 @@ function MMF_BuildUnitFramesMediaSection(ctx)
     rightSection.frameColorsTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
     rightSection.frameColorsTitle:SetText("FRAME COLORS")
 
-    local frameColorRowsStartY = -466 + RIGHT_STACK_Y_OFFSET
-    local frameColorRowSpacing = 22
+    local frameColorHeaderRowY = -466 + RIGHT_STACK_Y_OFFSET
+    local frameColorRowsStartY = frameColorHeaderRowY - 28
+    local frameColorRowSpacing = 26
     local frameColorPetY = frameColorRowsStartY - (frameColorRowSpacing * 4)
 
     -- Three visual groups:
     -- 1) Unit frame colors
     -- 2) Frame alpha + health BG controls
     -- 3) Health border controls
-    local frameColorAlphaY = frameColorPetY - 28
-    local frameColorDividerUnderPetY = frameColorAlphaY - 24
-    local frameColorsStartY = frameColorDividerUnderPetY - 18
-    local frameColorsRowSpacing = 30
+    local frameColorAlphaY = frameColorPetY - 34
+    local frameColorDividerUnderPetY = frameColorAlphaY - 28
+    local frameColorsStartY = frameColorDividerUnderPetY - 22
+    local frameColorsRowSpacing = 36
     local healthBGAlphaY = frameColorsStartY - frameColorsRowSpacing
-    local frameColorsDividerUnderHealthBGAlphaY = healthBGAlphaY - 26
-    local healthBorderY = frameColorsDividerUnderHealthBGAlphaY - 8
-    local borderSectionRowSpacing = 20
+    local frameColorsDividerUnderHealthBGAlphaY = healthBGAlphaY - 30
+    local healthBorderY = frameColorsDividerUnderHealthBGAlphaY - 12
+    local borderSectionRowSpacing = 24
     local borderWidthY = healthBorderY - borderSectionRowSpacing
     local borderAlphaY = borderWidthY - borderSectionRowSpacing
 
@@ -415,6 +417,26 @@ function MMF_BuildUnitFramesMediaSection(ctx)
         if not MMF_UpdateUnitFrame then
             return
         end
+        if not unit then
+            local allFrames = {
+                MMF_PlayerFrame,
+                MMF_TargetFrame,
+                MMF_TargetOfTargetFrame,
+                MMF_FocusFrame,
+                MMF_PetFrame,
+                MMF_Boss1Frame,
+                MMF_Boss2Frame,
+                MMF_Boss3Frame,
+                MMF_Boss4Frame,
+                MMF_Boss5Frame,
+            }
+            for _, frame in ipairs(allFrames) do
+                if frame then
+                    MMF_UpdateUnitFrame(frame)
+                end
+            end
+            return
+        end
         if unit == "player" and MMF_PlayerFrame then
             MMF_UpdateUnitFrame(MMF_PlayerFrame)
         elseif unit == "target" and MMF_TargetFrame then
@@ -426,6 +448,41 @@ function MMF_BuildUnitFramesMediaSection(ctx)
         elseif unit == "pet" and MMF_PetFrame then
             MMF_UpdateUnitFrame(MMF_PetFrame)
         end
+    end
+
+    rightSection.healthGradientColorCheck = CreateMinimalCheckbox(
+        unitFramesCol,
+        "Health Color By Percent",
+        RIGHT_COL_X,
+        frameColorHeaderRowY,
+        "useHealthGradientColor",
+        false,
+        function()
+            RequestFrameColorRefresh()
+        end
+    )
+
+    local function SetColorPickerEnabled(colorPicker, enabled)
+        if not colorPicker then
+            return
+        end
+        colorPicker:SetAlpha(enabled and 1 or 0.45)
+        if colorPicker.swatchButton then
+            colorPicker.swatchButton:EnableMouse(enabled)
+        end
+        if colorPicker.resetButton then
+            colorPicker.resetButton:EnableMouse(enabled)
+        end
+    end
+
+    local function RefreshFrameColorPickersEnabledState()
+        local gradientEnabled = MattMinimalFramesDB and MattMinimalFramesDB.useHealthGradientColor == true
+        local pickersEnabled = not gradientEnabled
+        SetColorPickerEnabled(rightSection.playerFrameColorPicker, pickersEnabled)
+        SetColorPickerEnabled(rightSection.targetFrameColorPicker, pickersEnabled)
+        SetColorPickerEnabled(rightSection.totFrameColorPicker, pickersEnabled)
+        SetColorPickerEnabled(rightSection.focusFrameColorPicker, pickersEnabled)
+        SetColorPickerEnabled(rightSection.petFrameColorPicker, pickersEnabled)
     end
 
     local function GetPlayerClassColor()
@@ -659,4 +716,11 @@ function MMF_BuildUnitFramesMediaSection(ctx)
             return (db.petBarColorMode or "default") == (d.petBarColorMode or "default")
         end,
     })
+
+    if rightSection.healthGradientColorCheck and rightSection.healthGradientColorCheck.checkbox then
+        rightSection.healthGradientColorCheck.checkbox:HookScript("OnClick", function()
+            RefreshFrameColorPickersEnabledState()
+        end)
+    end
+    RefreshFrameColorPickersEnabledState()
 end

@@ -1,3 +1,3 @@
 function MMF_GetPopupFooterVersionText()
-    return "v.7.1.3"
+    return "|cFFFFE27Av7.2.0|r|cFFE7ECF3  |  |r|cFFFFB3B3Join the community Discord.|r"
 end

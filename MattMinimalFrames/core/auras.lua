@@ -17,6 +17,21 @@ local function NotSecretValue(value)
     return not issecretvalue or not issecretvalue(value)
 end
 
+local function ShouldUseBlizzardAuraAnchoring(unitToken)
+    local db = MattMinimalFramesDB or {}
+    if unitToken == "player" then
+        if db.playerUseBlizzardAuraAnchoring ~= nil then
+            return db.playerUseBlizzardAuraAnchoring == true
+        end
+    else
+        if db.targetUseBlizzardAuraAnchoring ~= nil then
+            return db.targetUseBlizzardAuraAnchoring == true
+        end
+    end
+    -- Backward compatibility for profiles saved before split player/target toggles.
+    return db.useBlizzardAuraAnchoring == true
+end
+
 local function ClearAuraFrameState(auraFrame)
     if not auraFrame then
         return
@@ -115,14 +130,37 @@ end
 
 local function GetAuraDirectionValue(isDebuff, unitToken)
     local db = MattMinimalFramesDB or {}
+    local forceDebuffsDown = isDebuff and ShouldUseBlizzardAuraAnchoring(unitToken)
+
+    local function NormalizeDebuffGrowthDown(direction)
+        if direction == "left_up" then
+            return "left_down"
+        elseif direction == "right_up" then
+            return "right_down"
+        elseif direction == "up_left" then
+            return "down_left"
+        elseif direction == "up_right" then
+            return "down_right"
+        end
+        return direction
+    end
+
     if unitToken == "player" then
         if isDebuff then
-            return NormalizeAuraDirection(db.playerDebuffAuraDirection, "left_up")
+            local value = NormalizeAuraDirection(db.playerDebuffAuraDirection, "left_up")
+            if forceDebuffsDown then
+                value = NormalizeDebuffGrowthDown(value)
+            end
+            return value
         end
         return NormalizeAuraDirection(db.playerBuffAuraDirection, "right_down")
     end
     if isDebuff then
-        return NormalizeAuraDirection(db.debuffAuraDirection, "right_up")
+        local value = NormalizeAuraDirection(db.debuffAuraDirection, "right_up")
+        if forceDebuffsDown then
+            value = NormalizeDebuffGrowthDown(value)
+        end
+        return value
     end
     return NormalizeAuraDirection(db.buffAuraDirection, "left_down")
 end
@@ -141,6 +179,18 @@ local function GetAuraDirectionConfig(directionValue)
         horizontalSign = hSign,
         verticalSign = vSign,
     }
+end
+
+local function HasVisibleAuras(container)
+    if not container or not container.auras then
+        return false
+    end
+    for _, aura in ipairs(container.auras) do
+        if aura and aura.IsShown and aura:IsShown() then
+            return true
+        end
+    end
+    return false
 end
 
 local function ApplyAuraContainerPosition(container, isDebuff, x, y)
@@ -172,20 +222,45 @@ local function ApplyAuraContainerPosition(container, isDebuff, x, y)
     local offsetX = tonumber(x) or defaultX
     local offsetY = tonumber(y) or defaultY
 
-    container:ClearAllPoints()
+    local anchorPoint
+    local relativeTo = ownerFrame
+    local relativePoint
+
     if unitToken == "player" then
         if isDebuff then
-            container:SetPoint("TOPRIGHT", ownerFrame, "TOPRIGHT", offsetX, offsetY)
+            anchorPoint = "TOPRIGHT"
+            relativePoint = "TOPRIGHT"
         else
-            container:SetPoint("TOPLEFT", ownerFrame, "BOTTOMLEFT", offsetX, offsetY)
+            anchorPoint = "TOPLEFT"
+            relativePoint = "BOTTOMLEFT"
         end
     else
         if isDebuff then
-            container:SetPoint("TOPLEFT", ownerFrame, "TOPLEFT", offsetX, offsetY)
+            anchorPoint = "TOPLEFT"
+            relativePoint = "TOPLEFT"
         else
-            container:SetPoint("TOPRIGHT", ownerFrame, "BOTTOMRIGHT", offsetX, offsetY)
+            anchorPoint = "TOPRIGHT"
+            relativePoint = "BOTTOMRIGHT"
         end
     end
+
+    if isDebuff and ShouldUseBlizzardAuraAnchoring(unitToken) then
+        local db = MattMinimalFramesDB or {}
+        local showBuffsKey = (unitToken == "player") and "showPlayerBuffs" or "showBuffs"
+        local buffsEnabled = (db[showBuffsKey] ~= false)
+        local buffContainer = ownerFrame and ownerFrame.BuffContainer
+        if buffsEnabled and buffContainer and buffContainer.IsShown and buffContainer:IsShown() and HasVisibleAuras(buffContainer) then
+            relativeTo = buffContainer
+            relativePoint = (unitToken == "player") and "BOTTOMRIGHT" or "BOTTOMLEFT"
+            -- Debuff offsets are stored for the legacy frame anchor.
+            -- When attaching below buffs, translate to local offsets from the buff edge.
+            offsetX = offsetX - defaultX
+            offsetY = offsetY - defaultY - AURA_ICON_SPACING
+        end
+    end
+
+    container:ClearAllPoints()
+    container:SetPoint(anchorPoint, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 local function IsAuraDragModeEnabled()
@@ -244,11 +319,41 @@ local function StartAuraContainerDrag(container)
     local db = MattMinimalFramesDB or {}
     local startX = tonumber(db[xKey]) or defaultX
     local startY = tonumber(db[yKey]) or defaultY
+    local unitToken = (container and container.mmfAuraUnit) or "target"
     local scale = UIParent and UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
     if scale <= 0 then
         scale = 1
     end
     local cursorX, cursorY = GetCursorPosition()
+
+    local groupDrag = false
+    local groupBuffContainer = nil
+    local groupDebuffContainer = nil
+    local groupBuffXKey = nil
+    local groupBuffYKey = nil
+    local groupBuffStartX = nil
+    local groupBuffStartY = nil
+    local groupDebuffXKey = nil
+    local groupDebuffYKey = nil
+    local groupDebuffDefaultX = nil
+    local groupDebuffDefaultY = nil
+
+    if ShouldUseBlizzardAuraAnchoring(unitToken) then
+        local ownerFrame = container and container.mmfAuraOwnerFrame
+        if ownerFrame and ownerFrame.BuffContainer and ownerFrame.DebuffContainer then
+            groupDrag = true
+            groupBuffContainer = ownerFrame.BuffContainer
+            groupDebuffContainer = ownerFrame.DebuffContainer
+
+            local buffDefaultX, buffDefaultY
+            groupBuffXKey, groupBuffYKey, buffDefaultX, buffDefaultY = GetAuraOffsetKeysForContainer(groupBuffContainer, false)
+            groupBuffStartX = tonumber(db[groupBuffXKey]) or buffDefaultX
+            groupBuffStartY = tonumber(db[groupBuffYKey]) or buffDefaultY
+
+            groupDebuffXKey, groupDebuffYKey, groupDebuffDefaultX, groupDebuffDefaultY =
+                GetAuraOffsetKeysForContainer(groupDebuffContainer, true)
+        end
+    end
 
     container.mmfAuraDragState = {
         xKey = xKey,
@@ -257,6 +362,17 @@ local function StartAuraContainerDrag(container)
         startOffsetY = startY,
         startCursorX = (cursorX or 0) / scale,
         startCursorY = (cursorY or 0) / scale,
+        groupDrag = groupDrag,
+        groupBuffContainer = groupBuffContainer,
+        groupDebuffContainer = groupDebuffContainer,
+        groupBuffXKey = groupBuffXKey,
+        groupBuffYKey = groupBuffYKey,
+        groupBuffStartOffsetX = groupBuffStartX,
+        groupBuffStartOffsetY = groupBuffStartY,
+        groupDebuffXKey = groupDebuffXKey,
+        groupDebuffYKey = groupDebuffYKey,
+        groupDebuffDefaultX = groupDebuffDefaultX,
+        groupDebuffDefaultY = groupDebuffDefaultY,
     }
     container.mmfAuraDragging = true
     container:SetScript("OnUpdate", function(self)
@@ -271,10 +387,26 @@ local function StartAuraContainerDrag(container)
         local cx, cy = GetCursorPosition()
         local dx = ((cx or 0) / s) - state.startCursorX
         local dy = ((cy or 0) / s) - state.startCursorY
+
+        if state.groupDrag and state.groupBuffContainer and state.groupDebuffContainer then
+            local newBuffX = math.floor((state.groupBuffStartOffsetX + dx) + 0.5)
+            local newBuffY = math.floor((state.groupBuffStartOffsetY + dy) + 0.5)
+            MattMinimalFramesDB[state.groupBuffXKey] = newBuffX
+            MattMinimalFramesDB[state.groupBuffYKey] = newBuffY
+
+            ApplyAuraContainerPosition(state.groupBuffContainer, false, newBuffX, newBuffY)
+
+            local currentDebuffX = tonumber(MattMinimalFramesDB[state.groupDebuffXKey]) or state.groupDebuffDefaultX
+            local currentDebuffY = tonumber(MattMinimalFramesDB[state.groupDebuffYKey]) or state.groupDebuffDefaultY
+            ApplyAuraContainerPosition(state.groupDebuffContainer, true, currentDebuffX, currentDebuffY)
+            return
+        end
+
         local newX = math.floor((state.startOffsetX + dx) + 0.5)
         local newY = math.floor((state.startOffsetY + dy) + 0.5)
         MattMinimalFramesDB[state.xKey] = newX
         MattMinimalFramesDB[state.yKey] = newY
+
         ApplyAuraContainerPosition(self, self.mmfAuraIsDebuff == true, newX, newY)
     end)
 end
@@ -592,6 +724,20 @@ local function GetActiveAuraCount(container)
     return count
 end
 
+local function GetAuraOffsetsForUnit(unit, isDebuff)
+    local db = MattMinimalFramesDB or {}
+    if unit == "player" then
+        if isDebuff then
+            return db.playerDebuffXOffset, db.playerDebuffYOffset
+        end
+        return db.playerBuffXOffset, db.playerBuffYOffset
+    end
+    if isDebuff then
+        return MMF_GetDebuffXOffset(), MMF_GetDebuffYOffset()
+    end
+    return MMF_GetBuffXOffset(), MMF_GetBuffYOffset()
+end
+
 local function LayoutAuraContainer(container, isDebuff, size, activeCount)
     if not container or not container.auras then
         return
@@ -659,12 +805,14 @@ local function LayoutAuraContainer(container, isDebuff, size, activeCount)
             (step * effectiveRows) - AURA_ICON_SPACING
         )
     else
-        -- Keep old default visual spacing (3 rows) while avoiding extreme vertical drift
-        -- when users set large row counts but only a few buffs are visible.
-        local baselineRows = math.min(rows, 3)
+        local useBlizzardAnchoring = ShouldUseBlizzardAuraAnchoring(unitToken)
+        -- Legacy mode keeps the old minimum visual footprint for buffs.
+        -- Blizzard-style anchoring uses active aura rows/cols so debuffs can flow dynamically below buffs.
+        local baselineRows = useBlizzardAnchoring and effectiveRows or math.min(rows, 3)
         local buffRows = math.max(effectiveRows, baselineRows)
+        local buffCols = useBlizzardAnchoring and effectiveCols or perRow
         container:SetSize(
-            (step * perRow) - AURA_ICON_SPACING,
+            (step * buffCols) - AURA_ICON_SPACING,
             (step * buffRows) - AURA_ICON_SPACING
         )
     end
@@ -992,7 +1140,7 @@ local function UpdateAuraIcon(auraFrame, auraData, filter, unit, index)
 
     auraFrame.icon:SetTexture(auraData.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
     auraFrame.auraData = auraData
-    auraFrame.auraIndex = index or auraData._index
+    auraFrame.auraIndex = (auraData and auraData._index) or index
     auraFrame.auraFilter = filter
     auraFrame.auraUnit = unit
     auraFrame.auraInstanceID = auraInstanceID
@@ -1188,6 +1336,10 @@ local function UpdateUnitAuras(unit)
             LayoutAuraContainer(debuffContainer, true, nil, math.min(16, GetVisibleAuraLimit(true, unit)))
             UpdateAuraContainerLabel(debuffContainer, showLabels)
         end
+        local buffX, buffY = GetAuraOffsetsForUnit(unit, false)
+        local debuffX, debuffY = GetAuraOffsetsForUnit(unit, true)
+        ApplyAuraContainerPosition(buffContainer, false, buffX, buffY)
+        ApplyAuraContainerPosition(debuffContainer, true, debuffX, debuffY)
         return
     end
 
@@ -1268,6 +1420,11 @@ local function UpdateUnitAuras(unit)
         LayoutAuraContainer(debuffContainer, true, nil, shownDebuffs)
         UpdateAuraContainerLabel(debuffContainer, showLabels)
     end
+
+    local buffX, buffY = GetAuraOffsetsForUnit(unit, false)
+    local debuffX, debuffY = GetAuraOffsetsForUnit(unit, true)
+    ApplyAuraContainerPosition(buffContainer, false, buffX, buffY)
+    ApplyAuraContainerPosition(debuffContainer, true, debuffX, debuffY)
 end
 
 function MMF_UpdateTargetAuras()

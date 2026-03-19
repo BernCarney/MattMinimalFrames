@@ -19,17 +19,51 @@ function MMF_BuildAurasPowerTargetAurasSection(ctx)
     local DEBUFF_TOGGLE_Y = -56
     local AURA_TYPE_Y = -84
 
-    CreateMinimalCheckbox(root, "Buffs", AURA_COL_X, BUFF_TOGGLE_Y, "showBuffs", true, function()
+    local function ApplyCompactCheckboxLayout(checkboxControl, textWidth)
+        if not checkboxControl or not checkboxControl.resetButton or not checkboxControl.checkbox or not checkboxControl.labelText then
+            return
+        end
+        local reset = checkboxControl.resetButton
+        local cb = checkboxControl.checkbox
+        local text = checkboxControl.labelText
+
+        text:ClearAllPoints()
+        text:SetPoint("LEFT", cb, "RIGHT", 6, 0)
+        text:SetWidth(textWidth or 112)
+        text:SetJustifyH("LEFT")
+
+        reset:ClearAllPoints()
+        reset:SetPoint("LEFT", text, "RIGHT", 8, 0)
+    end
+
+    local buffsCheckbox = CreateMinimalCheckbox(root, "Buffs", AURA_COL_X, BUFF_TOGGLE_Y, "showBuffs", true, function()
         if MMF_UpdateTargetAuras then
             MMF_UpdateTargetAuras()
         end
     end)
 
-    CreateMinimalCheckbox(root, "Debuffs", AURA_COL_X, DEBUFF_TOGGLE_Y, "showDebuffs", true, function()
+    local debuffsCheckbox = CreateMinimalCheckbox(root, "Debuffs", AURA_COL_X, DEBUFF_TOGGLE_Y, "showDebuffs", true, function()
         if MMF_UpdateTargetAuras then
             MMF_UpdateTargetAuras()
         end
     end)
+
+    local blizzardAnchorCheckbox = CreateMinimalCheckbox(root, "Blizzard Anchor", AURA_COL_X + 136, BUFF_TOGGLE_Y, "targetUseBlizzardAuraAnchoring", false, function()
+        if MMF_UpdateAuraLayout then
+            MMF_UpdateAuraLayout()
+        else
+            if MMF_UpdateTargetAuras then
+                MMF_UpdateTargetAuras()
+            end
+            if MMF_UpdatePlayerAuras then
+                MMF_UpdatePlayerAuras()
+            end
+        end
+    end)
+
+    ApplyCompactCheckboxLayout(buffsCheckbox, 36)
+    ApplyCompactCheckboxLayout(debuffsCheckbox, 46)
+    ApplyCompactCheckboxLayout(blizzardAnchorCheckbox, 92)
 
     local auraTypeOptions = {
         { value = "buff", label = "Target Buffs" },
@@ -233,10 +267,10 @@ function MMF_BuildAurasPowerTargetAurasSection(ctx)
 
     RefreshPositionResetButtons = function()
         if buffPositionResetButton then
-            buffPositionResetButton:SetShown(not IsPositionDefault("buff"))
+            buffPositionResetButton:SetShown(true)
         end
         if debuffPositionResetButton then
-            debuffPositionResetButton:SetShown(not IsPositionDefault("debuff"))
+            debuffPositionResetButton:SetShown(true)
         end
     end
 

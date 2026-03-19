@@ -184,6 +184,7 @@ local PROFILE_LAYOUT_KEYS = {
     "MMF_Boss5Frame",
     "powerBarPositions",
     "powerTextPositions",
+    "hpTextPositions",
     "castBarPositions",
     "popupPosition",
 }

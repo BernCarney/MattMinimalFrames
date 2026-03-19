@@ -7,6 +7,9 @@ local UnitHealthMax = UnitHealthMax
 local UnitHealth = UnitHealth
 local UnitHealthPercent = UnitHealthPercent
 local UnitName = UnitName
+local UnitClass = UnitClass
+local UnitIsPlayer = UnitIsPlayer
+local UnitIsEnemy = UnitIsEnemy
 local UnitPowerType = UnitPowerType
 local UnitPowerMax = UnitPowerMax
 local UnitPower = UnitPower
@@ -148,6 +151,87 @@ local function ClampColorChannel(value, fallback)
     if n < 0 then n = 0 end
     if n > 1 then n = 1 end
     return n
+end
+
+local function SafeAccessibleNumber(value, fallback)
+    if canaccessvalue and not canaccessvalue(value) then
+        return fallback
+    end
+    local ok, n = pcall(tonumber, value)
+    if ok and type(n) == "number" then
+        return n
+    end
+    return fallback
+end
+
+local function ClampUnitInterval(value, fallback)
+    local n = SafeToNumber(value, fallback)
+    if type(n) ~= "number" then
+        n = fallback or 0
+    end
+    if n < 0 then n = 0 end
+    if n > 1 then n = 1 end
+    return n
+end
+
+local function GetHealthGradientColor(percent)
+    local normalized = SafeAccessibleNumber(percent, nil)
+    if type(normalized) ~= "number" then
+        return nil, nil, nil
+    end
+
+    if normalized < 0 then normalized = 0 end
+    if normalized > 1 then normalized = 1 end
+    percent = normalized
+    if percent >= 0.5 then
+        local t = ClampUnitInterval((percent - 0.5) * 2, 0)
+        return 1 - t, 1, 0
+    end
+
+    local t = ClampUnitInterval(percent * 2, 0)
+    return 1, t, 0
+end
+
+local healthGradientCurve = nil
+local function EnsureHealthGradientCurve()
+    if healthGradientCurve or not C_CurveUtil or not C_CurveUtil.CreateColorCurve then
+        return healthGradientCurve
+    end
+    local curve = C_CurveUtil.CreateColorCurve()
+    if not curve then
+        return nil
+    end
+    curve:SetType(Enum.LuaCurveType.Linear)
+    curve:ClearPoints()
+    curve:AddPoint(0, CreateColor(1, 0, 0, 1))
+    curve:AddPoint(0.5, CreateColor(1, 1, 0, 1))
+    curve:AddPoint(1, CreateColor(0, 1, 0, 1))
+    healthGradientCurve = curve
+    return healthGradientCurve
+end
+
+local function GetHealthGradientColorForUnit(unit, fallbackPercent)
+    local curve = EnsureHealthGradientCurve()
+    if UnitHealthPercent and curve then
+        local okCurveColor, curveColor = pcall(UnitHealthPercent, unit, true, curve)
+        if okCurveColor and curveColor then
+            if type(curveColor) == "table" then
+                if curveColor.GetRGB then
+                    local okRgb, r, g, b = pcall(curveColor.GetRGB, curveColor)
+                    if okRgb and type(r) == "number" and type(g) == "number" and type(b) == "number" then
+                        return r, g, b
+                    end
+                end
+                local r = curveColor.r
+                local g = curveColor.g
+                local b = curveColor.b
+                if type(r) == "number" and type(g) == "number" and type(b) == "number" then
+                    return r, g, b
+                end
+            end
+        end
+    end
+    return GetHealthGradientColor(fallbackPercent)
 end
 
 local function IsDispelHighlightEnabledForUnit(unit, db)
@@ -566,6 +650,44 @@ local function GetDisplayUnitName(unit, unitName)
     return truncated
 end
 
+local function GetReactionColorForNameText(unit)
+    if UnitIsEnemy and UnitIsEnemy("player", unit) then
+        return 0.8, 0.2, 0.2
+    end
+    if UnitIsFriend and UnitIsFriend("player", unit) then
+        return 0.2, 0.8, 0.2
+    end
+    return 1, 1, 0
+end
+
+local function GetNameTextColor(unit, db)
+    local usePlayerClassColor = IsCheckedFlag(db and db.colorPlayerNameTextByClass)
+    local useNPCReactionColor = IsCheckedFlag(db and db.colorNPCNameTextByReaction)
+    if not usePlayerClassColor and not useNPCReactionColor then
+        return 1, 1, 1
+    end
+
+    local unitExists = UnitExists(unit)
+    if not unitExists and unit ~= "player" then
+        return 1, 1, 1
+    end
+
+    local isPlayerUnit = unitExists and UnitIsPlayer and UnitIsPlayer(unit)
+    if usePlayerClassColor and isPlayerUnit and UnitClass and RAID_CLASS_COLORS then
+        local _, classToken = UnitClass(unit)
+        local classColor = classToken and RAID_CLASS_COLORS[classToken]
+        if classColor then
+            return classColor.r or 1, classColor.g or 1, classColor.b or 1
+        end
+    end
+
+    if useNPCReactionColor and not isPlayerUnit then
+        return GetReactionColorForNameText(unit)
+    end
+
+    return 1, 1, 1
+end
+
 local function TryApplyFont(region, fontPath, size, flags)
     if not region then
         return false
@@ -792,6 +914,8 @@ local function UpdateHealPrediction(frame)
     local maxHealth = UnitHealthMax(unit)
     local healthTexture = frame.healthBar:GetStatusBarTexture()
     local barWidth = frame.healthBar:GetWidth()
+    local barHeight = frame.healthBar:GetHeight()
+    local verticalHealthFill = MattMinimalFramesDB and MattMinimalFramesDB.healthFillTopToBottom == true
     local showOverhealPrediction = MattMinimalFramesDB and MattMinimalFramesDB.showOverhealPrediction == true
     local containOverhealWithinFrame = MattMinimalFramesDB and MattMinimalFramesDB.containOverhealWithinFrame == true
 
@@ -814,20 +938,30 @@ local function UpdateHealPrediction(frame)
 
     local overflowPixels = 0
     if showOverhealPrediction then
-        overflowPixels = math.floor(barWidth * 0.08 + 0.5)
+        local sizeForOverflow = verticalHealthFill and barHeight or barWidth
+        overflowPixels = math.floor(sizeForOverflow * 0.08 + 0.5)
         if overflowPixels < 4 then overflowPixels = 4 end
         if overflowPixels > 16 then overflowPixels = 16 end
     end
 
     if frame.healPredictionClip then
         frame.healPredictionClip:ClearAllPoints()
-        frame.healPredictionClip:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT", 0, 0)
-        frame.healPredictionClip:SetPoint("BOTTOMLEFT", frame.healthBar, "BOTTOMLEFT", 0, 0)
-        if containOverhealWithinFrame then
-
-            frame.healPredictionClip:SetWidth(barWidth * 1.01)
+        if verticalHealthFill then
+            frame.healPredictionClip:SetPoint("BOTTOMLEFT", frame.healthBar, "BOTTOMLEFT", 0, 0)
+            frame.healPredictionClip:SetPoint("BOTTOMRIGHT", frame.healthBar, "BOTTOMRIGHT", 0, 0)
+            if containOverhealWithinFrame then
+                frame.healPredictionClip:SetHeight(barHeight * 1.01)
+            else
+                frame.healPredictionClip:SetHeight(barHeight + overflowPixels)
+            end
         else
-            frame.healPredictionClip:SetWidth(barWidth + overflowPixels)
+            frame.healPredictionClip:SetPoint("TOPLEFT", frame.healthBar, "TOPLEFT", 0, 0)
+            frame.healPredictionClip:SetPoint("BOTTOMLEFT", frame.healthBar, "BOTTOMLEFT", 0, 0)
+            if containOverhealWithinFrame then
+                frame.healPredictionClip:SetWidth(barWidth * 1.01)
+            else
+                frame.healPredictionClip:SetWidth(barWidth + overflowPixels)
+            end
         end
     end
 
@@ -835,9 +969,15 @@ local function UpdateHealPrediction(frame)
     if frame.myHealPrediction.SetReverseFill then
         frame.myHealPrediction:SetReverseFill(false)
     end
-    frame.myHealPrediction:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT", 0, 0)
-    frame.myHealPrediction:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT", 0, 0)
-    frame.myHealPrediction:SetWidth(barWidth + overflowPixels)
+    if verticalHealthFill then
+        frame.myHealPrediction:SetPoint("BOTTOMLEFT", healthTexture, "TOPLEFT", 0, 0)
+        frame.myHealPrediction:SetPoint("BOTTOMRIGHT", healthTexture, "TOPRIGHT", 0, 0)
+        frame.myHealPrediction:SetHeight(barHeight + overflowPixels)
+    else
+        frame.myHealPrediction:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT", 0, 0)
+        frame.myHealPrediction:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT", 0, 0)
+        frame.myHealPrediction:SetWidth(barWidth + overflowPixels)
+    end
     frame.myHealPrediction:SetMinMaxValues(0, maxHealth)
 
     local myHealTexture = frame.myHealPrediction:GetStatusBarTexture()
@@ -845,9 +985,15 @@ local function UpdateHealPrediction(frame)
     if frame.otherHealPrediction.SetReverseFill then
         frame.otherHealPrediction:SetReverseFill(false)
     end
-    frame.otherHealPrediction:SetPoint("TOPLEFT", myHealTexture, "TOPRIGHT", 0, 0)
-    frame.otherHealPrediction:SetPoint("BOTTOMLEFT", myHealTexture, "BOTTOMRIGHT", 0, 0)
-    frame.otherHealPrediction:SetWidth(barWidth + overflowPixels)
+    if verticalHealthFill then
+        frame.otherHealPrediction:SetPoint("BOTTOMLEFT", myHealTexture, "TOPLEFT", 0, 0)
+        frame.otherHealPrediction:SetPoint("BOTTOMRIGHT", myHealTexture, "TOPRIGHT", 0, 0)
+        frame.otherHealPrediction:SetHeight(barHeight + overflowPixels)
+    else
+        frame.otherHealPrediction:SetPoint("TOPLEFT", myHealTexture, "TOPRIGHT", 0, 0)
+        frame.otherHealPrediction:SetPoint("BOTTOMLEFT", myHealTexture, "BOTTOMRIGHT", 0, 0)
+        frame.otherHealPrediction:SetWidth(barWidth + overflowPixels)
+    end
     frame.otherHealPrediction:SetMinMaxValues(0, maxHealth)
 
     local myHeal = 0
@@ -931,6 +1077,8 @@ local function UpdateAbsorbBar(frame)
 
     local maxHealth = UnitHealthMax(unit)
     local barWidth = frame.healthBar:GetWidth()
+    local barHeight = frame.healthBar:GetHeight()
+    local verticalHealthFill = MattMinimalFramesDB and MattMinimalFramesDB.healthFillTopToBottom == true
 
     local anchorTexture
     if frame.otherHealPrediction and frame.otherHealPrediction:IsShown() then
@@ -942,9 +1090,15 @@ local function UpdateAbsorbBar(frame)
     end
 
     frame.absorbBar:ClearAllPoints()
-    frame.absorbBar:SetPoint("TOPLEFT", anchorTexture, "TOPRIGHT", 0, 0)
-    frame.absorbBar:SetPoint("BOTTOMLEFT", anchorTexture, "BOTTOMRIGHT", 0, 0)
-    frame.absorbBar:SetWidth(barWidth)
+    if verticalHealthFill then
+        frame.absorbBar:SetPoint("BOTTOMLEFT", anchorTexture, "TOPLEFT", 0, 0)
+        frame.absorbBar:SetPoint("BOTTOMRIGHT", anchorTexture, "TOPRIGHT", 0, 0)
+        frame.absorbBar:SetHeight(barHeight)
+    else
+        frame.absorbBar:SetPoint("TOPLEFT", anchorTexture, "TOPRIGHT", 0, 0)
+        frame.absorbBar:SetPoint("BOTTOMLEFT", anchorTexture, "BOTTOMRIGHT", 0, 0)
+        frame.absorbBar:SetWidth(barWidth)
+    end
     frame.absorbBar:SetMinMaxValues(0, maxHealth)
 
     pcall(function()
@@ -1064,6 +1218,9 @@ local function UpdateUnitFrame(frame)
         ApplyAutoResizeNameText(frame, unit, displayName)
     end
 
+    local nameR, nameG, nameB = GetNameTextColor(unit, db)
+    frame.nameText:SetTextColor(nameR, nameG, nameB, 1)
+
     if MMF_UpdatePVPFlagIndicator then
         MMF_UpdatePVPFlagIndicator(frame)
     end
@@ -1080,6 +1237,13 @@ local function UpdateUnitFrame(frame)
         frame.healthBar:SetValue(hp)
     end
 
+    local healthPercentNormalized = nil
+    local safeHP = SafeAccessibleNumber(hp, nil)
+    local safeMaxHP = SafeAccessibleNumber(maxHP, nil)
+    if type(safeHP) == "number" and type(safeMaxHP) == "number" and not SafeIsLessOrEqual(safeMaxHP, 0) then
+        healthPercentNormalized = SafeDivide(safeHP, safeMaxHP, nil)
+    end
+
     local supportsHPText = (
         unit == "player"
         or unit == "target"
@@ -1092,18 +1256,20 @@ local function UpdateUnitFrame(frame)
         or unit == "boss4"
         or unit == "boss5"
     )
-
     if frame.hpText and supportsHPText then
         ApplyHPTextFontSize(frame, MMF_GetHPTextSize and MMF_GetHPTextSize(unit) or tonumber(db.hpTextSize) or 13)
         if hideHPText then
             frame.hpText:SetText("")
             frame.hpText:Hide()
+            if frame.hpTextDragFrame then frame.hpTextDragFrame:Hide() end
         elseif (previewMode or auraTestPreviewTarget) and not UnitExists(unit) then
             local showHPValueText = (db.showHPValueText ~= false)
             local showHPPercentText = (db.showHPPercentText == true)
             local useShortHPValue = (db.hpTextUseShortValue ~= false)
             frame.hpText:SetText(FormatPercentAndValue(999000, showHPPercentText, showHPValueText, useShortHPValue, "100%"))
             frame.hpText:Show()
+            if frame.hpTextDragFrame then frame.hpTextDragFrame:Show() end
+            healthPercentNormalized = 1
         else
             local hpPercentText = GetHealthPercentText(unit, hp, maxHP)
             local showHPPercentText = (db.showHPPercentText == true)
@@ -1111,6 +1277,7 @@ local function UpdateUnitFrame(frame)
             local useShortHPValue = (db.hpTextUseShortValue ~= false)
             frame.hpText:SetText(FormatPercentAndValue(hp, showHPPercentText, showHPValueText, useShortHPValue, hpPercentText))
             frame.hpText:Show()
+            if frame.hpTextDragFrame then frame.hpTextDragFrame:Show() end
         end
     end
 
@@ -1122,10 +1289,18 @@ local function UpdateUnitFrame(frame)
         and unit ~= "targettarget" and unit ~= "pet" and unit ~= "focus"
         and unit ~= "boss1" and unit ~= "boss2" and unit ~= "boss3" and unit ~= "boss4" and unit ~= "boss5" then
         if frame.hpText then frame.hpText:Hide() end
+        if frame.hpTextDragFrame then frame.hpTextDragFrame:Hide() end
         if frame.powerText then frame.powerText:Hide() end
+        if frame.powerTextDragFrame then frame.powerTextDragFrame:Hide() end
     end
 
     local r, g, b = MMF_GetUnitColor(unit)
+    if db.useHealthGradientColor == true then
+        local gr, gg, gb = GetHealthGradientColorForUnit(unit, healthPercentNormalized)
+        if gr and gg and gb then
+            r, g, b = gr, gg, gb
+        end
+    end
     local colorAlpha = (MMF_GetUnitColorAlpha and MMF_GetUnitColorAlpha(unit)) or 1
     if frame.healthBar then
         frame.healthBar:SetStatusBarColor(r, g, b, colorAlpha)

@@ -5,6 +5,7 @@ function MMF_BuildAurasPowerPowerSection(ctx)
     local RESOURCE_COL_X = ctx.resourceColX
     local isPlayerDruid = ctx.isPlayerDruid
     local RefreshPowerFrames = ctx.refreshPowerFrames or function() end
+    local accent = (MMF_GetPopupAccentColor and MMF_GetPopupAccentColor()) or { 0.6, 0.4, 0.9 }
 
     local generalTitle = root:CreateFontString(nil, "OVERLAY")
     generalTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
@@ -29,6 +30,64 @@ function MMF_BuildAurasPowerPowerSection(ctx)
     local playerPowerHeightSlider = nil
     local targetPowerWidthSlider = nil
     local targetPowerHeightSlider = nil
+
+    local function ResetPowerTextPosition(unit)
+        if unit ~= "player" and unit ~= "target" then
+            return
+        end
+        if not MattMinimalFramesDB then
+            MattMinimalFramesDB = {}
+        end
+        if MattMinimalFramesDB.powerTextPositions then
+            MattMinimalFramesDB.powerTextPositions[unit] = nil
+        end
+        if MMF_ApplyPowerTextPositions then
+            MMF_ApplyPowerTextPositions()
+        end
+        RefreshPowerFrames()
+    end
+
+    local function CreatePowerTextResetButton(x, y, onClick)
+        local button = CreateFrame("Button", nil, root, "BackdropTemplate")
+        button:SetSize(200, 22)
+        button:SetPoint("TOPLEFT", x, y)
+        button:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        button:SetBackdropColor(0.08, 0.08, 0.1, 1)
+        button:SetBackdropBorderColor(0.15, 0.15, 0.18, 1)
+
+        local text = button:CreateFontString(nil, "OVERLAY")
+        text:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 10, "")
+        text:SetPoint("CENTER")
+        text:SetTextColor(0.82, 0.82, 0.86)
+        text:SetText("RESET POWER POSITION")
+
+        button:SetScript("OnEnter", function(self)
+            self:SetBackdropColor(0.11, 0.11, 0.14, 1)
+            self:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.8)
+            text:SetTextColor(1, 1, 1)
+            GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+            GameTooltip:SetText("Reset Power Text Position", 1, 1, 1)
+            GameTooltip:AddLine("Resets dragged power text to default for this unit.", 0.75, 0.75, 0.75)
+            GameTooltip:Show()
+        end)
+        button:SetScript("OnLeave", function(self)
+            self:SetBackdropColor(0.08, 0.08, 0.1, 1)
+            self:SetBackdropBorderColor(0.15, 0.15, 0.18, 1)
+            text:SetTextColor(0.82, 0.82, 0.86)
+            GameTooltip:Hide()
+        end)
+        button:SetScript("OnClick", function()
+            if type(onClick) == "function" then
+                onClick()
+            end
+        end)
+
+        return button
+    end
 
     if MattMinimalFramesDB.showPlayerPowerPercentText == nil then
         MattMinimalFramesDB.showPlayerPowerPercentText = (MattMinimalFramesDB.showPowerPercentText == true)
@@ -101,36 +160,48 @@ function MMF_BuildAurasPowerPowerSection(ctx)
         RefreshPowerFrames()
     end)
 
-    local playerTextScaleY = -168
-    local playerWidthY = -192
-    local playerHeightY = -216
-    local targetDividerY = -244
-    local targetTitleY = -256
-    local targetPowerBarY = -276
-    local targetPowerTextY = -300
-    local targetColorTextY = -324
-    local targetPercentTextY = -348
-    local targetTextScaleY = -372
-    local targetWidthY = -396
-    local targetHeightY = -420
+    local playerResetY = -168
+    local playerTextScaleY = -196
+    local playerWidthY = -220
+    local playerHeightY = -244
+    local targetDividerY = -272
+    local targetTitleY = -284
+    local targetPowerBarY = -304
+    local targetPowerTextY = -328
+    local targetColorTextY = -352
+    local targetPercentTextY = -376
+    local targetResetY = -400
+    local targetTextScaleY = -428
+    local targetWidthY = -452
+    local targetHeightY = -476
 
     if isPlayerDruid then
         playerDruidManaPowerTextCheck = CreateMinimalCheckbox(root, "Mana Resource Only", RESOURCE_COL_X, -168, "showDruidManaPowerText", false, function()
             RefreshPowerFrames()
         end)
-        playerTextScaleY = -192
-        playerWidthY = -216
-        playerHeightY = -240
-        targetDividerY = -268
-        targetTitleY = -280
-        targetPowerBarY = -300
-        targetPowerTextY = -324
-        targetColorTextY = -348
-        targetPercentTextY = -372
-        targetTextScaleY = -396
-        targetWidthY = -420
-        targetHeightY = -444
+        playerResetY = -192
+        playerTextScaleY = -220
+        playerWidthY = -244
+        playerHeightY = -268
+        targetDividerY = -296
+        targetTitleY = -308
+        targetPowerBarY = -328
+        targetPowerTextY = -352
+        targetColorTextY = -376
+        targetPercentTextY = -400
+        targetResetY = -424
+        targetTextScaleY = -452
+        targetWidthY = -476
+        targetHeightY = -500
     end
+
+    CreatePowerTextResetButton(RESOURCE_COL_X, playerResetY, function()
+        ResetPowerTextPosition("player")
+    end)
+
+    CreatePowerTextResetButton(RESOURCE_COL_X, targetResetY, function()
+        ResetPowerTextPosition("target")
+    end)
 
     CreateMinimalSlider(root, "Text Scale", RESOURCE_COL_X, playerTextScaleY, 200, "playerPowerTextScale", 0.5, 2.0, 0.05, 1.0, function()
         RefreshPowerFrames()

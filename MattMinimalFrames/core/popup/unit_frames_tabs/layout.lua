@@ -2,6 +2,7 @@ function MMF_BuildUnitFramesLayoutSection(ctx)
     local unitFramesCol = ctx.parent
     local popup = ctx.popup
     local ACCENT_COLOR = ctx.accentColor
+    local CreateMinimalCheckbox = ctx.createMinimalCheckbox or MMF_CreateMinimalCheckbox
     local CreateMinimalSlider = ctx.createMinimalSlider
     local dropdownLists = ctx.dropdownLists
 
@@ -53,20 +54,51 @@ function MMF_BuildUnitFramesLayoutSection(ctx)
     frameScaleTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
     frameScaleTitle:SetText("FRAME SCALE")
 
+    local FRAME_SCALE_X_MIN = 0.1
+    local FRAME_SCALE_X_MAX = 6.0
+    local FRAME_SCALE_Y_MIN = 0.1
+    local FRAME_SCALE_Y_MAX = 10.0
+
     local scaleXSliders = {}
     local scaleYSliders = {}
     for _, opt in ipairs(scaleUnitOptions) do
         local prefix = GetPopupUnitPrefix(opt.value)
-        scaleXSliders[opt.value] = CreateMinimalSlider(unitFramesCol, "Scale X", LEFT_COL_X, -64, LEFT_COL_WIDTH, prefix .. "FrameScaleX", 0.5, 3.0, 0.05, 1.0, function()
-            if MMF_UpdateFrameScale then
-                MMF_UpdateFrameScale(opt.value)
-            end
-        end, false)
-        scaleYSliders[opt.value] = CreateMinimalSlider(unitFramesCol, "Scale Y", LEFT_COL_X, -88, LEFT_COL_WIDTH, prefix .. "FrameScaleY", 0.5, 5.0, 0.05, 1.0, function()
-            if MMF_UpdateFrameScale then
-                MMF_UpdateFrameScale(opt.value)
-            end
-        end, false)
+        scaleXSliders[opt.value] = CreateMinimalSlider(
+            unitFramesCol,
+            "Scale X",
+            LEFT_COL_X,
+            -64,
+            LEFT_COL_WIDTH,
+            prefix .. "FrameScaleX",
+            FRAME_SCALE_X_MIN,
+            FRAME_SCALE_X_MAX,
+            0.05,
+            1.0,
+            function()
+                if MMF_UpdateFrameScale then
+                    MMF_UpdateFrameScale(opt.value)
+                end
+            end,
+            false
+        )
+        scaleYSliders[opt.value] = CreateMinimalSlider(
+            unitFramesCol,
+            "Scale Y",
+            LEFT_COL_X,
+            -88,
+            LEFT_COL_WIDTH,
+            prefix .. "FrameScaleY",
+            FRAME_SCALE_Y_MIN,
+            FRAME_SCALE_Y_MAX,
+            0.05,
+            1.0,
+            function()
+                if MMF_UpdateFrameScale then
+                    MMF_UpdateFrameScale(opt.value)
+                end
+            end,
+            false
+        )
         scaleXSliders[opt.value]:Hide()
         scaleYSliders[opt.value]:Hide()
     end
@@ -102,6 +134,28 @@ function MMF_BuildUnitFramesLayoutSection(ctx)
     })
     dropdownLists.scaleUnitList = scaleUnitDropdown.list
     UpdateVisibleScaleSliders()
+
+    local fillDivider = unitFramesCol:CreateTexture(nil, "ARTWORK")
+    fillDivider:SetSize(LEFT_COL_WIDTH, 1)
+    fillDivider:SetPoint("TOPLEFT", LEFT_COL_X, -120)
+    fillDivider:SetColorTexture(0.42, 0.42, 0.46, 1)
+
+    CreateMinimalCheckbox(
+        unitFramesCol,
+        "Health Fill Top to Bottom",
+        LEFT_COL_X,
+        -136,
+        "healthFillTopToBottom",
+        false,
+        function()
+            if MMF_ApplyHealthFillDirections then
+                MMF_ApplyHealthFillDirections()
+            end
+            if MMF_RequestAllFramesUpdate then
+                MMF_RequestAllFramesUpdate()
+            end
+        end
+    )
 
 end
 
