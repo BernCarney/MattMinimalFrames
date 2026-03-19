@@ -893,10 +893,51 @@ end
 -- HEAL PREDICTION UPDATE
 --------------------------------------------------
 
+local function EnsureTextOverlayAbovePredictions(frame, overlayTopLevel)
+    if not frame or not frame.nameOverlay then
+        return
+    end
+
+    local frameLevel = (frame.GetFrameLevel and frame:GetFrameLevel()) or 0
+    local targetLevel = frameLevel + 30
+
+    local numericOverlayLevel = tonumber(overlayTopLevel)
+    if type(numericOverlayLevel) == "number" and (numericOverlayLevel + 6) > targetLevel then
+        targetLevel = numericOverlayLevel + 6
+    end
+
+    if frame.GetFrameStrata and frame.nameOverlay.SetFrameStrata and frame.nameOverlay.GetFrameStrata then
+        local desiredStrata = frame:GetFrameStrata()
+        if desiredStrata and frame.nameOverlay:GetFrameStrata() ~= desiredStrata then
+            frame.nameOverlay:SetFrameStrata(desiredStrata)
+        end
+    end
+    if frame.nameOverlay.SetFrameLevel then
+        if frame.mmfTextOverlayLevel ~= targetLevel then
+            frame.nameOverlay:SetFrameLevel(targetLevel)
+            frame.mmfTextOverlayLevel = targetLevel
+        end
+    end
+
+    if frame.mmfTextOverlayDrawLayerApplied ~= true then
+        if frame.nameText and frame.nameText.SetDrawLayer then
+            frame.nameText:SetDrawLayer("OVERLAY", 7)
+        end
+        if frame.hpText and frame.hpText.SetDrawLayer then
+            frame.hpText:SetDrawLayer("OVERLAY", 7)
+        end
+        if frame.powerText and frame.powerText.SetDrawLayer then
+            frame.powerText:SetDrawLayer("OVERLAY", 7)
+        end
+        frame.mmfTextOverlayDrawLayerApplied = true
+    end
+end
+
 local function UpdateHealPrediction(frame)
     if not frame or not frame.myHealPrediction then return end
 
     ApplyHealPredictionBarColor(frame)
+    EnsureTextOverlayAbovePredictions(frame, nil)
 
     local unit = frame.unit
     if not unit or not UnitExists(unit) then
@@ -919,6 +960,7 @@ local function UpdateHealPrediction(frame)
     local showOverhealPrediction = MattMinimalFramesDB and MattMinimalFramesDB.showOverhealPrediction == true
     local containOverhealWithinFrame = MattMinimalFramesDB and MattMinimalFramesDB.containOverhealWithinFrame == true
 
+    local overlayTopLevel = nil
     if frame.healPredictionClip and frame.myHealPrediction and frame.otherHealPrediction then
         if containOverhealWithinFrame then
             local topLevel = (frame.GetFrameLevel and frame:GetFrameLevel() or 0) + 20
@@ -928,13 +970,16 @@ local function UpdateHealPrediction(frame)
             frame.healPredictionClip:SetFrameLevel(topLevel)
             frame.myHealPrediction:SetFrameLevel(topLevel + 1)
             frame.otherHealPrediction:SetFrameLevel(topLevel + 2)
+            overlayTopLevel = topLevel + 2
         else
             local baseLevel = (frame.healthBar and frame.healthBar.GetFrameLevel and frame.healthBar:GetFrameLevel() or frame:GetFrameLevel() or 0) + 1
             frame.healPredictionClip:SetFrameLevel(baseLevel)
             frame.myHealPrediction:SetFrameLevel(baseLevel)
             frame.otherHealPrediction:SetFrameLevel(baseLevel)
+            overlayTopLevel = baseLevel
         end
     end
+    EnsureTextOverlayAbovePredictions(frame, overlayTopLevel)
 
     local overflowPixels = 0
     if showOverhealPrediction then

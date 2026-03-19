@@ -272,39 +272,8 @@ function MMF_EnsureToolsNoteFrame()
     end
 
     local function IsCursorInsideNote()
-        if not noteFrame or not noteFrame:IsShown() then
-            return false
-        end
-        local left = noteFrame:GetLeft()
-        local right = noteFrame:GetRight()
-        local top = noteFrame:GetTop()
-        local bottom = noteFrame:GetBottom()
-        if not left or not right or not top or not bottom then
-            return false
-        end
-
-        local rawX, rawY = GetCursorPosition()
-        local pad = 4
-        local function IsInsideWithScale(scale)
-            if not scale or scale == 0 then
-                return false
-            end
-            local cx = rawX / scale
-            local cy = rawY / scale
-            return (cx >= (left - pad) and cx <= (right + pad) and cy >= (bottom - pad) and cy <= (top + pad))
-        end
-
-        if IsInsideWithScale(noteFrame:GetEffectiveScale() or 1) then
-            return true
-        end
-        if UIParent and IsInsideWithScale(UIParent:GetEffectiveScale() or 1) then
-            return true
-        end
-        if type(MouseIsOver) == "function" then
-            local ok, isOver = pcall(MouseIsOver, noteFrame)
-            if ok and isOver == true then
-                return true
-            end
+        if MMF_IsCursorInsideFrame then
+            return MMF_IsCursorInsideFrame(noteFrame, 4)
         end
         return false
     end
@@ -339,6 +308,25 @@ function MMF_EnsureToolsNoteFrame()
         return baseAlpha
     end
 
+    local function EaseBackgroundFadeProgress(t)
+        if t <= 0 then
+            return 0
+        end
+        if t >= 1 then
+            return 1
+        end
+        return t * t * (3 - (2 * t))
+    end
+
+    local function GetBackgroundFadeDuration()
+        local cfg = (MMF_GetPopupInactiveFadeConfig and MMF_GetPopupInactiveFadeConfig()) or nil
+        local duration = cfg and tonumber(cfg.fadeTime) or nil
+        if duration == nil or duration <= 0 then
+            duration = 0.30
+        end
+        return duration
+    end
+
     local function RefreshBackgroundAlpha(animate)
         local target = GetTargetBackgroundAlpha()
         if not animate then
@@ -352,16 +340,17 @@ function MMF_EnsureToolsNoteFrame()
             return
         end
         local elapsed = 0
-        local duration = 0.12
+        local duration = GetBackgroundFadeDuration()
         alphaFadeDriver:SetScript("OnUpdate", function(_, dt)
-            elapsed = elapsed + dt
+            elapsed = elapsed + (dt or 0)
             local t = elapsed / duration
             if t >= 1 then
                 alphaFadeDriver:SetScript("OnUpdate", nil)
                 SetBackgroundAlphaVisual(target)
                 return
             end
-            SetBackgroundAlphaVisual(startAlpha + (target - startAlpha) * t)
+            local easedT = EaseBackgroundFadeProgress(t)
+            SetBackgroundAlphaVisual(startAlpha + (target - startAlpha) * easedT)
         end)
     end
 
@@ -863,8 +852,126 @@ function MMF_CreateToolsPage(rightCol, accentColor, accentHexPrefix, createMinim
         end
     end)
 
+    local function ClampPopupFadeAlpha(value)
+        if MMF_ClampPopupInactiveFadeAlpha then
+            return MMF_ClampPopupInactiveFadeAlpha(value, 0.60)
+        end
+        local n = tonumber(value) or 0.60
+        if n < 0.05 then n = 0.05 end
+        if n > 0.95 then n = 0.95 end
+        return n
+    end
+
+    local popupFadeContainer = CreateFrame("Frame", nil, rightCol)
+    popupFadeContainer:SetSize(256, 20)
+    popupFadeContainer:SetPoint("TOPLEFT", 12, -104)
+
+    local popupFadeCB = CreateFrame("CheckButton", nil, popupFadeContainer)
+    popupFadeCB:SetSize(14, 14)
+    popupFadeCB:SetPoint("LEFT", 0, 0)
+
+    local popupFadeBg = popupFadeCB:CreateTexture(nil, "BACKGROUND")
+    popupFadeBg:SetAllPoints()
+    popupFadeBg:SetColorTexture(0.08, 0.08, 0.1, 1)
+
+    local popupFadeBorder = popupFadeCB:CreateTexture(nil, "BORDER")
+    popupFadeBorder:SetPoint("TOPLEFT", -1, 1)
+    popupFadeBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+    popupFadeBorder:SetColorTexture(0.25, 0.25, 0.3, 1)
+
+    local popupFadeCheck = popupFadeCB:CreateTexture(nil, "ARTWORK")
+    popupFadeCheck:SetSize(8, 8)
+    popupFadeCheck:SetPoint("CENTER")
+    popupFadeCheck:SetColorTexture(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 1)
+    popupFadeCB.check = popupFadeCheck
+
+    local popupFadeText = popupFadeContainer:CreateFontString(nil, "OVERLAY")
+    popupFadeText:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 11, "")
+    popupFadeText:SetPoint("LEFT", popupFadeCB, "RIGHT", 6, 0)
+    popupFadeText:SetTextColor(0.9, 0.9, 0.9)
+    popupFadeText:SetText("Popup Inactive Fade")
+
+    local popupFadeAlphaHost = CreateFrame("Frame", nil, popupFadeContainer)
+    popupFadeAlphaHost:SetSize(98, 18)
+    popupFadeAlphaHost:SetPoint("RIGHT", 0, 0)
+
+    local popupFadeAlphaSlider = CreateFrame("Slider", nil, popupFadeAlphaHost, "BackdropTemplate")
+    popupFadeAlphaSlider:SetSize(64, 8)
+    popupFadeAlphaSlider:SetPoint("LEFT", 0, 0)
+    popupFadeAlphaSlider:SetOrientation("HORIZONTAL")
+    popupFadeAlphaSlider:SetMinMaxValues(0.05, 0.95)
+    popupFadeAlphaSlider:SetValueStep(0.05)
+    popupFadeAlphaSlider:SetObeyStepOnDrag(true)
+    popupFadeAlphaSlider:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    popupFadeAlphaSlider:SetBackdropColor(0.06, 0.06, 0.08, 1)
+
+    local popupFadeAlphaThumb = popupFadeAlphaSlider:CreateTexture(nil, "OVERLAY")
+    popupFadeAlphaThumb:SetSize(6, 12)
+    popupFadeAlphaThumb:SetColorTexture(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 1)
+    popupFadeAlphaSlider:SetThumbTexture(popupFadeAlphaThumb)
+
+    local popupFadeAlphaValueBg = CreateFrame("Frame", nil, popupFadeAlphaHost, "BackdropTemplate")
+    popupFadeAlphaValueBg:SetSize(30, 18)
+    popupFadeAlphaValueBg:SetPoint("RIGHT", 0, 0)
+    popupFadeAlphaValueBg:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    popupFadeAlphaValueBg:SetBackdropColor(0.06, 0.06, 0.08, 1)
+    popupFadeAlphaValueBg:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+
+    local popupFadeAlphaValue = popupFadeAlphaValueBg:CreateFontString(nil, "OVERLAY")
+    popupFadeAlphaValue:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 9, "")
+    popupFadeAlphaValue:SetPoint("CENTER")
+    popupFadeAlphaValue:SetTextColor(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 1)
+
+    popupFadeAlphaValueBg:SetScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 0.6)
+    end)
+    popupFadeAlphaValueBg:SetScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(0.25, 0.25, 0.3, 1)
+    end)
+
+    local initialFadeEnabled = MattMinimalFramesDB.popupInactiveFade
+    if initialFadeEnabled == nil then
+        initialFadeEnabled = true
+        MattMinimalFramesDB.popupInactiveFade = true
+    end
+    popupFadeCB:SetChecked(initialFadeEnabled)
+    popupFadeCheck:SetShown(initialFadeEnabled)
+
+    local initialFadeAlpha = ClampPopupFadeAlpha(MattMinimalFramesDB.popupInactiveFadeAlpha)
+    MattMinimalFramesDB.popupInactiveFadeAlpha = initialFadeAlpha
+    popupFadeAlphaSlider:SetValue(initialFadeAlpha)
+    popupFadeAlphaValue:SetText(string.format("%.2f", initialFadeAlpha))
+    popupFadeAlphaHost:SetShown(initialFadeEnabled)
+
+    popupFadeCB:SetScript("OnClick", function(self)
+        local checked = self:GetChecked()
+        self.check:SetShown(checked)
+        MattMinimalFramesDB.popupInactiveFade = checked
+        popupFadeAlphaHost:SetShown(checked)
+        if MMF_SetPopupInactiveFadeEnabled then
+            MMF_SetPopupInactiveFadeEnabled(checked)
+        elseif MMF_WelcomePopup and MMF_WelcomePopup.MMFApplyInactiveFade then
+            MMF_WelcomePopup:MMFApplyInactiveFade(checked, true)
+        end
+    end)
+
+    popupFadeAlphaSlider:SetScript("OnValueChanged", function(_, value)
+        local alpha = ClampPopupFadeAlpha(value)
+        popupFadeAlphaValue:SetText(string.format("%.2f", alpha))
+        MattMinimalFramesDB.popupInactiveFadeAlpha = alpha
+        if MMF_SetPopupInactiveFadeAlpha then
+            MMF_SetPopupInactiveFadeAlpha(alpha)
+        elseif MMF_WelcomePopup and MMF_WelcomePopup.MMFApplyInactiveFade then
+            MMF_WelcomePopup:MMFApplyInactiveFade(MattMinimalFramesDB.popupInactiveFade ~= false, true)
+        end
+    end)
+
     local noteCheckboxContainer
-    noteCheckboxContainer = CreateMinimalCheckbox(rightCol, "Simple Note", 12, -104, "showToolsNote", false, function(checked)
+    noteCheckboxContainer = CreateMinimalCheckbox(rightCol, "Simple Note", 12, -128, "showToolsNote", false, function(checked)
         if MMF_SetToolsNoteEnabled then
             MMF_SetToolsNoteEnabled(checked, noteCheckboxContainer and noteCheckboxContainer.checkbox)
         end
@@ -875,21 +982,21 @@ function MMF_CreateToolsPage(rightCol, accentColor, accentHexPrefix, createMinim
 
     local toolsDivider = rightCol:CreateTexture(nil, "ARTWORK")
     toolsDivider:SetSize(176, 1)
-    toolsDivider:SetPoint("TOPLEFT", 12, -136)
+    toolsDivider:SetPoint("TOPLEFT", 12, -160)
     toolsDivider:SetColorTexture(0.12, 0.12, 0.15, 1)
 
     local toolsActionsTitle = rightCol:CreateFontString(nil, "OVERLAY")
     toolsActionsTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
-    toolsActionsTitle:SetPoint("TOPLEFT", 12, -148)
+    toolsActionsTitle:SetPoint("TOPLEFT", 12, -172)
     toolsActionsTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
     toolsActionsTitle:SetText("ACTIONS")
 
-    CreateMinimalCheckbox(rightCol, "UI Sounds", 12, -172, "uiSoundsEnabled", true, nil)
+    CreateMinimalCheckbox(rightCol, "UI Sounds", 12, -196, "uiSoundsEnabled", true, nil)
 
 
     local toolsResetScaleBtn = CreateFrame("Button", nil, rightCol, "BackdropTemplate")
     toolsResetScaleBtn:SetSize(176, 24)
-    toolsResetScaleBtn:SetPoint("TOPLEFT", 12, -196)
+    toolsResetScaleBtn:SetPoint("TOPLEFT", 12, -220)
     toolsResetScaleBtn:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -916,7 +1023,7 @@ function MMF_CreateToolsPage(rightCol, accentColor, accentHexPrefix, createMinim
 
     local toolsResetAllBtn = CreateFrame("Button", nil, rightCol, "BackdropTemplate")
     toolsResetAllBtn:SetSize(176, 24)
-    toolsResetAllBtn:SetPoint("TOPLEFT", 12, -224)
+    toolsResetAllBtn:SetPoint("TOPLEFT", 12, -248)
     toolsResetAllBtn:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -946,18 +1053,18 @@ function MMF_CreateToolsPage(rightCol, accentColor, accentHexPrefix, createMinim
 
     local infoDivider = rightCol:CreateTexture(nil, "ARTWORK")
     infoDivider:SetSize(176, 1)
-    infoDivider:SetPoint("TOPLEFT", 12, -256)
+    infoDivider:SetPoint("TOPLEFT", 12, -280)
     infoDivider:SetColorTexture(0.12, 0.12, 0.15, 1)
 
     local toolsInfoTitle = rightCol:CreateFontString(nil, "OVERLAY")
     toolsInfoTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
-    toolsInfoTitle:SetPoint("TOPLEFT", 12, -268)
+    toolsInfoTitle:SetPoint("TOPLEFT", 12, -292)
     toolsInfoTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
     toolsInfoTitle:SetText("INFO")
 
     local infoText = rightCol:CreateFontString(nil, "OVERLAY")
     infoText:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 10, "")
-    infoText:SetPoint("TOPLEFT", 12, -292)
+    infoText:SetPoint("TOPLEFT", 12, -316)
     infoText:SetWidth(176)
     infoText:SetJustifyH("LEFT")
     infoText:SetSpacing(3)

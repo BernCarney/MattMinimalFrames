@@ -20,6 +20,16 @@ MMF_POPUP_LAYOUT = {
     PAGE_CONTENT_HEIGHT_TOOLS = 680,
 }
 
+MMF_POPUP_INACTIVE_FADE = {
+    FOCUS_ALPHA = 1.0,
+    DEFAULT_ALPHA = 0.60,
+    MIN_ALPHA = 0.05,
+    MAX_ALPHA = 0.95,
+    FADE_TIME = 0.30,
+    HOVER_POLL_INTERVAL = 0.03,
+    CURSOR_PAD = 4,
+}
+
 function MMF_GetPopupLayout()
     local layout = MMF_POPUP_LAYOUT or {}
     local isTBC = Compat and Compat.IsTBC
@@ -39,6 +49,19 @@ function MMF_GetPopupLayout()
         currentClassContentHeight = layout.PAGE_CONTENT_HEIGHT_CURRENT_CLASS or 760,
         profilesContentHeight = layout.PAGE_CONTENT_HEIGHT_PROFILES or 760,
         toolsContentHeight = layout.PAGE_CONTENT_HEIGHT_TOOLS or 760,
+    }
+end
+
+function MMF_GetPopupInactiveFadeConfig()
+    local cfg = MMF_POPUP_INACTIVE_FADE or {}
+    return {
+        focusAlpha = cfg.FOCUS_ALPHA or 1.0,
+        defaultAlpha = cfg.DEFAULT_ALPHA or 0.60,
+        minAlpha = cfg.MIN_ALPHA or 0.05,
+        maxAlpha = cfg.MAX_ALPHA or 0.95,
+        fadeTime = cfg.FADE_TIME or 0.30,
+        hoverPollInterval = cfg.HOVER_POLL_INTERVAL or 0.03,
+        cursorPad = cfg.CURSOR_PAD or 4,
     }
 end
 

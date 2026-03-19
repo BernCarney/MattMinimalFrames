@@ -218,6 +218,9 @@ local mmfDefaults = {
     playerDebuffAuraDirection = "left_up",
     -- Popup position (nil = default center)
     popupPosition = nil,
+    -- Fade popup a bit when cursor is not over it
+    popupInactiveFade = true,
+    popupInactiveFadeAlpha = 0.60,
     -- Move hints
     showMoveHints = false,
     -- Tools note

@@ -1,7 +1,7 @@
 ## Interface: 120001
 ## Title: Matt's Minimal Frames
 ## Author: Seathasky
-## Version: 7.2.0
+## Version: 7.2.1
 ## IconTexture: Interface\AddOns\MattMinimalFrames\Images\MMF.png
 ## SavedVariables: MattMinimalFramesDB, MattMinimalFramesProfilesDB, MattMinimalFramesGlobalDB
 
@@ -84,6 +84,10 @@ core/popup/footer/version.lua
 core/popup/footer/class_display.lua
 core/popup/footer/footer.lua
 core/popup/window.lua
+core/popup/content_shell.lua
+core/popup/page_frame.lua
+core/popup/scroll_controller.lua
+core/popup/inactive_fade.lua
 core/popup/navigation.lua
 core/popup/popup.lua
 

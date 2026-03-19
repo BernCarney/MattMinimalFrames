@@ -22,7 +22,7 @@ local POPUP_LAYOUT = (MMF_GetPopupLayout and MMF_GetPopupLayout()) or {
 local CreateMinimalCheckbox = MMF_CreateMinimalCheckbox
 local CreateMinimalSlider = MMF_CreateMinimalSlider
 local CreateSubTabBar = MMF_CreateSubTabBar
-local TITLE_WALLPAPER_ALPHA = 0.03
+local TITLE_WALLPAPER_ALPHA = 0.3
 local SIDEBAR_WALLPAPER_ALPHA = 0.10
 local SetAspectCropTexCoords = MMF_SetAspectCropTexCoords
 
@@ -39,6 +39,9 @@ end
 local CreateProfilesPage = MMF_CreateProfilesPage
 
 function MMF_ShowWelcomePopup(forceShow)
+    if MMF_EnsurePopupInactiveFadeDB then
+        MMF_EnsurePopupInactiveFadeDB()
+    end
     local ACCENT_COLOR = (MMF_GetPopupAccentColor and MMF_GetPopupAccentColor()) or { 0.6, 0.4, 0.9 }
     local ACCENT_HEX_PREFIX = (MMF_RGBToHexPrefix and MMF_RGBToHexPrefix(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3])) or "|cff9966e6"
 
@@ -65,6 +68,8 @@ function MMF_ShowWelcomePopup(forceShow)
 
     -- Main frame 
     local popup = CreateFrame("Frame", "MMF_WelcomePopup", UIParent, "BackdropTemplate")
+    -- CreateFrame starts shown by default; hide until fully built so first Show runs OnShow hooks.
+    popup:Hide()
     local popupHeight = POPUP_LAYOUT.height
     local popupWidth = POPUP_LAYOUT.width
     local MIN_POPUP_WIDTH = POPUP_LAYOUT.width
@@ -133,6 +138,10 @@ function MMF_ShowWelcomePopup(forceShow)
         windowController.PersistPopupPosition()
     end)
     popup:SetFrameStrata("DIALOG")
+    if MMF_CreatePopupInactiveFadeController then
+        MMF_CreatePopupInactiveFadeController(popup)
+    end
+
     popup.ApplyGUIScale = function(self, scale, preservePosition)
         windowController.ApplyPopupScale(scale, preservePosition)
     end
@@ -161,180 +170,26 @@ function MMF_ShowWelcomePopup(forceShow)
     local UpdateTitleWallpaperCrop = headerState.UpdateTitleWallpaperCrop or function() end
     local ApplyInitialTitleBarState = headerState.ApplyInitialTitleBarState or function() end
 
-    -- Content area (between title bar and footer)
-    local content = CreateFrame("Frame", nil, popup)
-    content:SetPoint("TOPLEFT", 0, -POPUP_LAYOUT.titleHeight)
-    content:SetPoint("BOTTOMRIGHT", 0, POPUP_LAYOUT.footerHeight)
-    content:SetClipsChildren(true)
+    local contentShell = MMF_CreatePopupContentShell(popup, {
+        popupLayout = POPUP_LAYOUT,
+        accentColor = ACCENT_COLOR,
+        sidebarWallpaperAlpha = SIDEBAR_WALLPAPER_ALPHA,
+        setAspectCropTexCoords = SetAspectCropTexCoords,
+    }) or {}
+    local tabBar = contentShell.tabBar
+    local navButtonHost = contentShell.navButtonHost
+    local pageHeaderTitle = contentShell.pageHeaderTitle
+    local pageHeaderSubtitle = contentShell.pageHeaderSubtitle
+    local pageScrollFrame = contentShell.pageScrollFrame
+    local sharedScrollBar = contentShell.sharedScrollBar
+    local SIDEBAR_WIDTH = contentShell.sidebarWidth or 180
 
-    local tabContainer = CreateFrame("Frame", nil, content)
-    tabContainer:SetPoint("TOPLEFT", POPUP_LAYOUT.contentSidePadding, POPUP_LAYOUT.contentTopOffset)
-    tabContainer:SetPoint("BOTTOMRIGHT", -POPUP_LAYOUT.contentSidePadding, 0)
-    tabContainer:SetClipsChildren(true)
-
-    local SIDEBAR_WIDTH = 180
-    local HEADER_HEIGHT = 68
-    local tabBar = CreateFrame("Frame", nil, tabContainer)
-    tabBar:SetPoint("TOPLEFT", 0, 0)
-    tabBar:SetPoint("BOTTOMLEFT", 0, 0)
-    tabBar:SetWidth(SIDEBAR_WIDTH)
-
-    local sidebarBg = CreateFrame("Frame", nil, tabBar, "BackdropTemplate")
-    sidebarBg:SetAllPoints()
-    sidebarBg:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    sidebarBg:SetBackdropColor(0.05, 0.07, 0.09, 0.72)
-    sidebarBg:SetBackdropBorderColor(0.12, 0.16, 0.18, 1)
-
-    local sidebarWallpaper = sidebarBg:CreateTexture(nil, "ARTWORK")
-    sidebarWallpaper:SetPoint("TOPLEFT", 1, -1)
-    sidebarWallpaper:SetPoint("BOTTOMRIGHT", -1, 1)
-    sidebarWallpaper:SetTexture("Interface\\AddOns\\MattMinimalFrames\\Images\\mw2.png")
-    sidebarWallpaper:SetAlpha(SIDEBAR_WALLPAPER_ALPHA)
-    SetAspectCropTexCoords(sidebarWallpaper, sidebarBg, 16 / 9)
-
-    local sidebarWallpaperTint = sidebarBg:CreateTexture(nil, "ARTWORK", nil, 1)
-    sidebarWallpaperTint:SetPoint("TOPLEFT", 1, -1)
-    sidebarWallpaperTint:SetPoint("BOTTOMRIGHT", -1, 1)
-    sidebarWallpaperTint:SetColorTexture(0.02, 0.03, 0.04, 0.02)
-
-    sidebarBg:SetScript("OnSizeChanged", function()
-        SetAspectCropTexCoords(sidebarWallpaper, sidebarBg, 16 / 9)
-    end)
-
-    local sidebarBrand = CreateFrame("Frame", nil, tabBar)
-    sidebarBrand:SetPoint("TOPLEFT", 0, 0)
-    sidebarBrand:SetPoint("TOPRIGHT", 0, 0)
-    sidebarBrand:SetHeight(64)
-
-    local sidebarBrandGlow = sidebarBrand:CreateTexture(nil, "ARTWORK")
-    sidebarBrandGlow:SetPoint("BOTTOMLEFT", 0, 0)
-    sidebarBrandGlow:SetPoint("BOTTOMRIGHT", 0, 0)
-    sidebarBrandGlow:SetHeight(2)
-    sidebarBrandGlow:SetColorTexture(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 0.95)
-
-    local sidebarBrandTitle = sidebarBrand:CreateFontString(nil, "OVERLAY")
-    sidebarBrandTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 20, "")
-    sidebarBrandTitle:SetPoint("TOPLEFT", 16, -16)
-    sidebarBrandTitle:SetTextColor(0.96, 0.97, 0.98)
-    sidebarBrandTitle:SetText("SETTINGS")
-
-    local sidebarBrandSub = sidebarBrand:CreateFontString(nil, "OVERLAY")
-    sidebarBrandSub:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 9, "")
-    sidebarBrandSub:SetPoint("TOPLEFT", sidebarBrandTitle, "BOTTOMLEFT", 0, -4)
-    sidebarBrandSub:SetTextColor(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3])
-    sidebarBrandSub:SetText("")
-
-    local navButtonHost = CreateFrame("Frame", nil, tabBar)
-    navButtonHost:SetPoint("TOPLEFT", sidebarBrand, "BOTTOMLEFT", 0, -14)
-    navButtonHost:SetPoint("TOPRIGHT", sidebarBrand, "BOTTOMRIGHT", 0, -14)
-    navButtonHost:SetPoint("BOTTOMLEFT", 0, 12)
-    navButtonHost:SetPoint("BOTTOMRIGHT", 0, 12)
-
-    local pageContainer = CreateFrame("Frame", nil, tabContainer)
-    pageContainer:SetPoint("TOPLEFT", tabBar, "TOPRIGHT", 12, 0)
-    pageContainer:SetPoint("BOTTOMRIGHT", 0, 0)
-    pageContainer:SetClipsChildren(true)
-
-    local pageHeader = CreateFrame("Frame", nil, pageContainer, "BackdropTemplate")
-    pageHeader:SetPoint("TOPLEFT", 0, 0)
-    pageHeader:SetPoint("TOPRIGHT", -(12 + 4), 0)
-    pageHeader:SetHeight(HEADER_HEIGHT)
-    pageHeader:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    pageHeader:SetBackdropColor(0.05, 0.07, 0.09, 0.96)
-    pageHeader:SetBackdropBorderColor(0.12, 0.16, 0.18, 1)
-
-    local pageHeaderWallpaper = pageHeader:CreateTexture(nil, "ARTWORK")
-    pageHeaderWallpaper:SetPoint("TOPLEFT", 1, -1)
-    pageHeaderWallpaper:SetPoint("BOTTOMRIGHT", -1, 1)
-    pageHeaderWallpaper:SetTexture("Interface\\AddOns\\MattMinimalFrames\\Images\\mw.png")
-    pageHeaderWallpaper:SetAlpha(0.12)
-    SetAspectCropTexCoords(pageHeaderWallpaper, pageHeader, 16 / 9)
-    pageHeader:SetScript("OnSizeChanged", function()
-        SetAspectCropTexCoords(pageHeaderWallpaper, pageHeader, 16 / 9)
-    end)
-
-    local pageHeaderGlow = pageHeader:CreateTexture(nil, "ARTWORK")
-    pageHeaderGlow:SetPoint("BOTTOMLEFT", 0, 0)
-    pageHeaderGlow:SetPoint("BOTTOMRIGHT", 0, 0)
-    pageHeaderGlow:SetHeight(2)
-    pageHeaderGlow:SetColorTexture(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 0.95)
-
-    local pageHeaderShade = pageHeader:CreateTexture(nil, "BACKGROUND")
-    pageHeaderShade:SetPoint("TOPLEFT", 0, 0)
-    pageHeaderShade:SetPoint("TOPRIGHT", 0, 0)
-    pageHeaderShade:SetHeight(22)
-    pageHeaderShade:SetColorTexture(0.02, 0.03, 0.04, 0.10)
-
-    local pageHeaderTitle = pageHeader:CreateFontString(nil, "OVERLAY")
-    pageHeaderTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 18, "")
-    pageHeaderTitle:SetPoint("TOPLEFT", 16, -14)
-    pageHeaderTitle:SetTextColor(0.98, 0.98, 0.98)
-
-    local pageHeaderSubtitle = pageHeader:CreateFontString(nil, "OVERLAY")
-    pageHeaderSubtitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 10, "")
-    pageHeaderSubtitle:SetPoint("TOPLEFT", pageHeaderTitle, "BOTTOMLEFT", 0, -6)
-    pageHeaderSubtitle:SetTextColor(0.62, 0.67, 0.71)
-
-    local SCROLLBAR_WIDTH = 12
-    local SCROLLBAR_GAP = 4
-
-    local pageScrollFrame = CreateFrame("ScrollFrame", nil, pageContainer)
-    pageScrollFrame:SetPoint("TOPLEFT", pageHeader, "BOTTOMLEFT", 0, -8)
-    pageScrollFrame:SetPoint("BOTTOMRIGHT", -(SCROLLBAR_WIDTH + SCROLLBAR_GAP), 0)
-    pageScrollFrame:EnableMouseWheel(true)
-    pageScrollFrame:SetClipsChildren(true)
-
-    local sharedScrollBar = CreateFrame("Slider", nil, pageContainer, "BackdropTemplate")
-    sharedScrollBar:SetPoint("TOPRIGHT", 0, -2)
-    sharedScrollBar:SetPoint("BOTTOMRIGHT", 0, 2)
-    sharedScrollBar:SetWidth(SCROLLBAR_WIDTH)
-    sharedScrollBar:SetOrientation("VERTICAL")
-    sharedScrollBar:SetMinMaxValues(0, 0)
-    sharedScrollBar:SetValueStep(1)
-    sharedScrollBar:SetObeyStepOnDrag(true)
-    sharedScrollBar:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    sharedScrollBar:SetBackdropColor(0.03, 0.03, 0.04, 1)
-    sharedScrollBar:SetBackdropBorderColor(0.15, 0.15, 0.18, 1)
-    local sharedThumb = sharedScrollBar:CreateTexture(nil, "OVERLAY")
-    sharedThumb:SetSize(8, 24)
-    sharedThumb:SetColorTexture(ACCENT_COLOR[1], ACCENT_COLOR[2], ACCENT_COLOR[3], 1)
-    sharedScrollBar:SetThumbTexture(sharedThumb)
-
-    local function CreatePageFrame(parent, contentHeight)
-        local page = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-        page:SetPoint("TOPLEFT", 0, 0)
-        page:SetWidth(10)
-        page:SetHeight(contentHeight or 760)
-        page:SetClipsChildren(true)
-        page:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        page:SetBackdropColor(0.08, 0.10, 0.13, 0.96)
-        page:SetBackdropBorderColor(0.12, 0.16, 0.18, 1)
-
-        return page
-    end
-
-    local leftCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.aurasPowerContentHeight)
-    local partyRaidCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.partyRaidContentHeight)
-    local unitFramesCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.unitFramesContentHeight)
-    local middleCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.currentClassContentHeight)
-    local rightCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.toolsContentHeight)
-    local profilesCol = CreatePageFrame(pageScrollFrame, POPUP_LAYOUT.profilesContentHeight)
+    local leftCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.aurasPowerContentHeight)
+    local partyRaidCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.partyRaidContentHeight)
+    local unitFramesCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.unitFramesContentHeight)
+    local middleCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.currentClassContentHeight)
+    local rightCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.toolsContentHeight)
+    local profilesCol = MMF_CreatePopupPageFrame(pageScrollFrame, POPUP_LAYOUT.profilesContentHeight)
 
     local castBarColorList
     local unitTextureList
@@ -399,81 +254,14 @@ function MMF_ShowWelcomePopup(forceShow)
         rightCol,
         profilesCol,
     }
-    local activePage
-    local function ApplyPageWidths(explicitWidth)
-        local w = explicitWidth or pageScrollFrame:GetWidth() or 1
-        w = math.max(1, w)
-        for _, page in ipairs(allPages) do
-            page:SetWidth(w)
-        end
-    end
-
-    local function GetActivePageScrollRange()
-        local page = activePage
-        if not page then
-            return 0, 0
-        end
-
-        if type(page.MMFGetSectionRange) == "function" then
-            local startY, endY = page:MMFGetSectionRange()
-            startY = math.max(0, tonumber(startY) or 0)
-            endY = math.max(startY, tonumber(endY) or (page:GetHeight() or 0))
-            return startY, endY
-        end
-
-        return 0, page:GetHeight() or 0
-    end
-
-    local function UpdateSharedScrollBounds()
-        local page = activePage
-        if not page then
-            sharedScrollBar:SetMinMaxValues(0, 0)
-            sharedScrollBar:SetValue(0)
-            pageScrollFrame:SetVerticalScroll(0)
-            return
-        end
-
-        local viewHeight = pageScrollFrame:GetHeight() or 0
-        local sectionStart, sectionEnd = GetActivePageScrollRange()
-        local contentHeight = math.max(0, sectionEnd - sectionStart)
-        local maxScroll = math.max(0, contentHeight - viewHeight)
-        local current = sharedScrollBar:GetValue() or 0
-        if current > maxScroll then
-            current = maxScroll
-        end
-
-        sharedScrollBar:SetMinMaxValues(0, maxScroll)
-        sharedScrollBar:SetValue(current)
-        sharedScrollBar:SetEnabled(maxScroll > 0)
-        sharedScrollBar:SetAlpha(maxScroll > 0 and 1 or 0.45)
-        pageScrollFrame:SetVerticalScroll(sectionStart + current)
-    end
-
-    sharedScrollBar:SetScript("OnValueChanged", function(self, value)
-        local sectionStart = 0
-        if activePage and type(activePage.MMFGetSectionRange) == "function" then
-            local startY = activePage:MMFGetSectionRange()
-            sectionStart = math.max(0, tonumber(startY) or 0)
-        end
-        pageScrollFrame:SetVerticalScroll(sectionStart + (value or 0))
-    end)
-
-    pageScrollFrame:SetScript("OnMouseWheel", function(_, delta)
-        local minScroll, maxScroll = sharedScrollBar:GetMinMaxValues()
-        local current = sharedScrollBar:GetValue() or 0
-        local step = 32
-        if delta > 0 then
-            current = math.max(minScroll, current - step)
-        else
-            current = math.min(maxScroll, current + step)
-        end
-        sharedScrollBar:SetValue(current)
-    end)
-
-    pageScrollFrame:SetScript("OnSizeChanged", function(_, width)
-        ApplyPageWidths(width)
-        UpdateSharedScrollBounds()
-    end)
+    local scrollController = MMF_CreatePopupScrollController({
+        pageScrollFrame = pageScrollFrame,
+        sharedScrollBar = sharedScrollBar,
+        pages = allPages,
+    }) or {}
+    local ApplyPageWidths = scrollController.ApplyPageWidths or function() end
+    local UpdateSharedScrollBounds = scrollController.UpdateSharedScrollBounds or function() end
+    local SetActiveScrollPage = scrollController.SetActivePage or function() end
     ApplyPageWidths()
     local tabPages
     local tabDefs
@@ -528,9 +316,7 @@ function MMF_ShowWelcomePopup(forceShow)
         closeListFrame = CloseListFrame,
         updateSharedScrollBounds = UpdateSharedScrollBounds,
         isUISoundsEnabledFn = IsUISoundsEnabled,
-        setActivePage = function(page)
-            activePage = page
-        end,
+        setActivePage = SetActiveScrollPage,
         onUnitFramesTabActivated = function()
             if unitFramesState and unitFramesState.ApplyInitialSection then
                 unitFramesState.ApplyInitialSection()
