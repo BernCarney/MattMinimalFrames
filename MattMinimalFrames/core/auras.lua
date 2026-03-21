@@ -42,7 +42,6 @@ local function ClearAuraFrameState(auraFrame)
     auraFrame.auraFilter = nil
     auraFrame.auraUnit = nil
     auraFrame.auraInstanceID = nil
-    auraFrame.auraSpellID = nil
 
     if auraFrame.count then
         auraFrame.count:Hide()
@@ -1003,9 +1002,6 @@ local function CreateAuraIcon(parent, index, isDebuff, iconSize)
         if not tooltipSet and self.auraIndex then
             tooltipSet = GameTooltip:SetUnitAura(unit, self.auraIndex, self.auraFilter) and true or false
         end
-        if not tooltipSet and self.auraSpellID and GameTooltip.SetSpellByID then
-            tooltipSet = GameTooltip:SetSpellByID(self.auraSpellID) and true or false
-        end
 
         if tooltipSet then
             GameTooltip:Show()
@@ -1140,35 +1136,16 @@ end
 --------------------------------------------------
 
 local function UpdateAuraIcon(auraFrame, auraData, filter, unit, index)
-    local auraInstanceID = auraData and auraData.auraInstanceID or nil
-    local auraIcon = auraData and auraData.icon or nil
-    local auraIndex = (auraData and auraData._index) or index
-    local auraSpellID = auraData and auraData.spellId or nil
-    if not auraIcon and auraSpellID and type(GetSpellTexture) == "function" then
-        auraIcon = GetSpellTexture(auraSpellID)
-    end
-    if not auraIcon then
-        auraIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
-    end
+    local auraInstanceID = NotSecretValue(auraData and auraData.auraInstanceID) and auraData.auraInstanceID or nil
 
-    auraFrame.icon:SetTexture(auraIcon)
+    auraFrame.icon:SetTexture(auraData.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
     auraFrame.auraData = auraData
-    auraFrame.auraIndex = auraIndex
+    auraFrame.auraIndex = (auraData and auraData._index) or index
     auraFrame.auraFilter = filter
     auraFrame.auraUnit = unit
     auraFrame.auraInstanceID = auraInstanceID
-    auraFrame.auraSpellID = auraSpellID
     
     if auraFrame.count then auraFrame.count:Hide() end
-    local auraCount = GetAuraCount(auraData or {}, unit)
-    local displayCount = nil
-    if NotSecretValue(auraCount) and type(auraCount) == "number" then
-        displayCount = auraCount
-    elseif NotSecretValue(auraData and auraData.applications) and type(auraData and auraData.applications) == "number" then
-        displayCount = auraData.applications
-    elseif NotSecretValue(auraData and auraData.count) and type(auraData and auraData.count) == "number" then
-        displayCount = auraData.count
-    end
     if auraInstanceID and C_UnitAuras and C_UnitAuras.GetAuraApplicationDisplayCount then
         if not auraFrame.count then
             auraFrame.count = auraFrame:CreateFontString(nil, "OVERLAY")
@@ -1176,18 +1153,16 @@ local function UpdateAuraIcon(auraFrame, auraData, filter, unit, index)
         end
         local scale = MMF_GetAuraTextScale()
         auraFrame.count:SetFont("Fonts\\FRIZQT__.TTF", math.max(6, math.floor(10 * scale)), "OUTLINE")
-        if displayCount and displayCount > 1 then
-            auraFrame.count:SetText(displayCount)
-            auraFrame.count:Show()
-        end
-    elseif displayCount and displayCount > 1 then
+        auraFrame.count:SetText(C_UnitAuras.GetAuraApplicationDisplayCount(unit, auraInstanceID, 2, 999))
+        auraFrame.count:Show()
+    elseif auraData.count and auraData.count > 1 then
         if not auraFrame.count then
             auraFrame.count = auraFrame:CreateFontString(nil, "OVERLAY")
             auraFrame.count:SetPoint("BOTTOMRIGHT", auraFrame, "BOTTOMRIGHT", -1, 1)
         end
         local scale = MMF_GetAuraTextScale()
         auraFrame.count:SetFont("Fonts\\FRIZQT__.TTF", math.max(6, math.floor(10 * scale)), "OUTLINE")
-        auraFrame.count:SetText(displayCount)
+        auraFrame.count:SetText(auraData.count)
         auraFrame.count:Show()
     end
     if auraFrame.cooldown then
@@ -1213,7 +1188,6 @@ local function UpdateFakeAuraIcon(auraFrame, index, isDebuff)
     auraFrame.auraFilter = nil
     auraFrame.auraUnit = nil
     auraFrame.auraInstanceID = nil
-    auraFrame.auraSpellID = nil
     auraFrame.icon:SetTexture("Interface\\AddOns\\MattMinimalFrames\\Images\\MMF.png")
 
     if not auraFrame.count then
@@ -1295,15 +1269,6 @@ local function IsPlayerOwnedDebuff(auraData)
     return sourceUnit == "player" or sourceUnit == "pet" or sourceUnit == "vehicle"
 end
 
-local function IsAuraRenderable(auraData)
-    if type(auraData) ~= "table" then
-        return false
-    end
-    return auraData.icon ~= nil
-        or auraData.spellId ~= nil
-        or auraData.name ~= nil
-end
-
 local function GetRetailPlayerDebuffs(unit)
     local debuffs = GetUnitAuras(unit, "HARMFUL|PLAYER")
     if debuffs and #debuffs > 0 then
@@ -1334,94 +1299,6 @@ local function GetRetailPlayerDebuffs(unit)
     end
 
     return fallback
-end
-
-local function GetRetailTargetDebuffs(unit)
-    local debuffs = {}
-    local harmfulFilter = "HARMFUL|INCLUDE_NAME_PLATE_ONLY"
-    if AuraUtil and AuraUtil.CreateFilterString and AuraUtil.AuraFilters then
-        harmfulFilter = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Harmful, AuraUtil.AuraFilters.IncludeNameplateOnly)
-    end
-
-    if AuraUtil and AuraUtil.ForEachAura then
-        AuraUtil.ForEachAura(unit, harmfulFilter, 40, function(aura)
-            if type(aura) ~= "table" or aura.icon == nil then
-                return false
-            end
-            debuffs[#debuffs + 1] = {
-                name = aura.name,
-                icon = aura.icon,
-                count = aura.applications or aura.count,
-                applications = aura.applications or aura.count,
-                debuffType = aura.dispelName or aura.debuffType,
-                duration = aura.duration,
-                expirationTime = aura.expirationTime,
-                source = aura.sourceUnit or aura.source or aura.caster,
-                sourceUnit = aura.sourceUnit or aura.source or aura.caster,
-                spellId = aura.spellId,
-                auraInstanceID = aura.auraInstanceID,
-                isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
-                isFromPlayerOrPet = aura.isFromPlayerOrPet,
-                castByPlayer = aura.castByPlayer,
-                isPlayerAura = aura.isPlayerAura,
-                _index = #debuffs + 1,
-            }
-            return #debuffs >= 40
-        end, true)
-    end
-
-    if #debuffs == 0 and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
-        for i = 1, 40 do
-            local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, harmfulFilter)
-            if not aura then
-                break
-            end
-            if aura.icon ~= nil then
-                debuffs[#debuffs + 1] = {
-                    name = aura.name,
-                    icon = aura.icon,
-                    count = aura.applications or aura.count,
-                    applications = aura.applications or aura.count,
-                    debuffType = aura.dispelName or aura.debuffType,
-                    duration = aura.duration,
-                    expirationTime = aura.expirationTime,
-                    source = aura.sourceUnit or aura.source or aura.caster,
-                    sourceUnit = aura.sourceUnit or aura.source or aura.caster,
-                    spellId = aura.spellId,
-                    auraInstanceID = aura.auraInstanceID,
-                    isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
-                    isFromPlayerOrPet = aura.isFromPlayerOrPet,
-                    castByPlayer = aura.castByPlayer,
-                    isPlayerAura = aura.isPlayerAura,
-                    _index = i,
-                }
-            end
-        end
-    end
-
-    if #debuffs == 0 and type(UnitDebuff) == "function" then
-        for i = 1, 40 do
-            local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
-            if not name then
-                break
-            end
-            debuffs[#debuffs + 1] = {
-                name = name,
-                icon = icon,
-                count = count,
-                applications = count,
-                debuffType = debuffType,
-                duration = duration,
-                expirationTime = expirationTime,
-                source = source,
-                sourceUnit = source,
-                spellId = spellId,
-                _index = i,
-            }
-        end
-    end
-
-    return debuffs
 end
 
 local function UpdateUnitAuras(unit)
@@ -1471,21 +1348,6 @@ local function UpdateUnitAuras(unit)
     end
 
     if type(UnitExists) == "function" and not UnitExists(unit) then
-        frame.mmfAuraUnitGUID = nil
-        ClearAuraContainer(frame.BuffContainer)
-        ClearAuraContainer(frame.DebuffContainer)
-        UpdateAuraContainerLabel(frame.BuffContainer, false)
-        UpdateAuraContainerLabel(frame.DebuffContainer, false)
-        return
-    end
-
-    -- Do not compare/cache UnitGUID here: it can become a secret string in combat
-    -- and trigger forbidden comparisons. Target swaps are already handled by
-    -- PLAYER_TARGET_CHANGED where containers are explicitly cleared.
-
-    -- Target corpses frequently stop producing reliable aura updates.
-    -- Clear immediately so stale icons never linger on dead mobs.
-    if unit == "target" and type(UnitIsDeadOrGhost) == "function" and UnitIsDeadOrGhost(unit) then
         ClearAuraContainer(frame.BuffContainer)
         ClearAuraContainer(frame.DebuffContainer)
         UpdateAuraContainerLabel(frame.BuffContainer, false)
@@ -1495,37 +1357,10 @@ local function UpdateUnitAuras(unit)
 
     local buffs = GetUnitAuras(unit, "HELPFUL")
     local debuffs = nil
-    local targetHarmfulFilter = "HARMFUL|INCLUDE_NAME_PLATE_ONLY"
-    if AuraUtil and AuraUtil.CreateFilterString and AuraUtil.AuraFilters then
-        targetHarmfulFilter = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Harmful, AuraUtil.AuraFilters.IncludeNameplateOnly)
-    end
     if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and HasRetailAuraAPI then
         debuffs = GetRetailPlayerDebuffs(unit)
-    elseif unit == "target" and HasRetailAuraAPI then
-        debuffs = GetRetailTargetDebuffs(unit)
     else
         debuffs = GetUnitAuras(unit, "HARMFUL")
-    end
-    if unit == "target" and (type(debuffs) ~= "table" or #debuffs == 0) and type(UnitDebuff) == "function" then
-        local fallbackDebuffs = {}
-        for i = 1, 40 do
-            local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
-            if not name then
-                break
-            end
-            fallbackDebuffs[#fallbackDebuffs + 1] = {
-                name = name,
-                icon = icon,
-                count = count,
-                debuffType = debuffType,
-                duration = duration,
-                expirationTime = expirationTime,
-                source = source,
-                spellId = spellId,
-                _index = i,
-            }
-        end
-        debuffs = fallbackDebuffs
     end
 
     local buffContainer = frame.BuffContainer
@@ -1535,19 +1370,11 @@ local function UpdateUnitAuras(unit)
     else
         buffContainer:Show()
         ClearAuraContainer(buffContainer)
-        local buffLimit = GetVisibleAuraLimit(false, unit)
-        local shownBuffs = 0
-        for i = 1, #buffs do
-            if shownBuffs >= buffLimit then
-                break
-            end
-            local auraData = buffs[i]
-            if IsAuraRenderable(auraData) then
-                shownBuffs = shownBuffs + 1
-                local auraFrame = buffContainer.auras[shownBuffs]
-                if auraFrame then
-                    UpdateAuraIcon(auraFrame, auraData, "HELPFUL", unit, i)
-                end
+        local shownBuffs = math.min(#buffs, GetVisibleAuraLimit(false, unit))
+        for i = 1, shownBuffs do
+            local auraFrame = buffContainer.auras[i]
+            if auraFrame then
+                UpdateAuraIcon(auraFrame, buffs[i], "HELPFUL", unit, i)
             end
         end
         LayoutAuraContainer(buffContainer, false, nil, shownBuffs)
@@ -1563,12 +1390,6 @@ local function UpdateUnitAuras(unit)
         ClearAuraContainer(debuffContainer)
 
         local debuffsToDisplay = debuffs
-        local debuffTooltipFilter = "HARMFUL"
-        if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and HasRetailAuraAPI then
-            debuffTooltipFilter = "HARMFUL|PLAYER"
-        elseif unit == "target" and HasRetailAuraAPI then
-            debuffTooltipFilter = targetHarmfulFilter
-        end
         if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and not HasRetailAuraAPI then
             debuffsToDisplay = {}
             for i = 1, #debuffs do
@@ -1579,26 +1400,19 @@ local function UpdateUnitAuras(unit)
             end
         end
 
-        local debuffLimit = GetVisibleAuraLimit(true, unit)
-        local shownDebuffs = 0
-        for i = 1, #debuffsToDisplay do
-            if shownDebuffs >= debuffLimit then
-                break
-            end
-            local debuffData = debuffsToDisplay[i]
-            if IsAuraRenderable(debuffData) then
-                shownDebuffs = shownDebuffs + 1
-                local auraFrame = debuffContainer.auras[shownDebuffs]
-                if auraFrame then
-                    UpdateAuraIcon(auraFrame, debuffData, debuffTooltipFilter, unit, i)
-                    if auraFrame.border then
-                        local dispelName = debuffData.dispelName or debuffData.debuffType
-                        if NotSecretValue(dispelName) then
-                            local color = DebuffTypeColor and DebuffTypeColor[dispelName or "none"] or {r=1,g=1,b=1}
-                            auraFrame.border:SetVertexColor(color.r, color.g, color.b)
-                        else
-                            auraFrame.border:SetVertexColor(1, 1, 1)
-                        end
+        local shownDebuffs = math.min(#debuffsToDisplay, GetVisibleAuraLimit(true, unit))
+        for i = 1, shownDebuffs do
+            local auraFrame = debuffContainer.auras[i]
+            if auraFrame then
+                local debuffData = debuffsToDisplay[i]
+                UpdateAuraIcon(auraFrame, debuffData, "HARMFUL", unit, i)
+                if auraFrame.border then
+                    local dispelName = debuffData.dispelName or debuffData.debuffType
+                    if NotSecretValue(dispelName) then
+                        local color = DebuffTypeColor and DebuffTypeColor[dispelName or "none"] or {r=1,g=1,b=1}
+                        auraFrame.border:SetVertexColor(color.r, color.g, color.b)
+                    else
+                        auraFrame.border:SetVertexColor(1, 1, 1)
                     end
                 end
             end
@@ -1625,39 +1439,11 @@ end
 -- AURA EVENTS
 --------------------------------------------------
 
-local targetAuraRefreshEpoch = 0
-
-local function ScheduleTargetAuraResync()
-    if not (C_Timer and C_Timer.After) then
-        return
-    end
-
-    targetAuraRefreshEpoch = targetAuraRefreshEpoch + 1
-    local epoch = targetAuraRefreshEpoch
-
-    local function RefreshIfCurrent()
-        if epoch ~= targetAuraRefreshEpoch then
-            return
-        end
-        MMF_UpdateTargetAuras()
-        if MMF_UpdateDispelHighlights then
-            MMF_UpdateDispelHighlights()
-        end
-    end
-
-    C_Timer.After(0, RefreshIfCurrent)
-    C_Timer.After(0.10, RefreshIfCurrent)
-    C_Timer.After(0.25, RefreshIfCurrent)
-end
-
 local auraEventFrame = CreateFrame("Frame")
 auraEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 auraEventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 auraEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 auraEventFrame:RegisterEvent("UNIT_AURA")
-auraEventFrame:RegisterEvent("UNIT_HEALTH")
-auraEventFrame:RegisterEvent("UNIT_FLAGS")
-auraEventFrame:RegisterEvent("UNIT_TARGETABLE_CHANGED")
 auraEventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 auraEventFrame:RegisterEvent("SPELLS_CHANGED")
 auraEventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
@@ -1676,35 +1462,24 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end
-    elseif event == "UNIT_AURA" then
-        -- Some UNIT_AURA payloads can arrive without a usable unit token.
-        -- Fall back to refreshing both tracked units to avoid stale display.
-        if unit == "target" or unit == "player" then
-            if unit == "target" then
-                MMF_UpdateTargetAuras()
-            else
-                MMF_UpdateBlizzardPlayerAuraVisibility()
-                MMF_UpdatePlayerAuras()
-            end
-        else
-            MMF_UpdateTargetAuras()
-            MMF_UpdateBlizzardPlayerAuraVisibility()
-            MMF_UpdatePlayerAuras()
-        end
+    elseif event == "UNIT_AURA" and unit == "target" then
+        MMF_UpdateTargetAuras()
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end
-    elseif (event == "UNIT_HEALTH" or event == "UNIT_FLAGS" or event == "UNIT_TARGETABLE_CHANGED") and unit == "target" then
-        MMF_UpdateTargetAuras()
+    elseif event == "UNIT_AURA" and unit == "player" then
+        MMF_UpdateBlizzardPlayerAuraVisibility()
+        MMF_UpdatePlayerAuras()
+        if MMF_UpdateDispelHighlights then
+            MMF_UpdateDispelHighlights()
+        end
     elseif event == "PLAYER_TARGET_CHANGED" then
         if MMF_TargetFrame then
-            MMF_TargetFrame.mmfAuraUnitGUID = nil
             ClearAuraContainer(MMF_TargetFrame.BuffContainer)
             ClearAuraContainer(MMF_TargetFrame.DebuffContainer)
         end
         MMF_UpdateTargetAuras()
         MMF_UpdatePlayerAuras()
-        ScheduleTargetAuraResync()
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end

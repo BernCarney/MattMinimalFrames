@@ -250,9 +250,18 @@ local function ApplyCharacterProfilePreference()
         MattMinimalFramesProfilesDB.profiles.Default = {}
     end
 
+    local currentActive = MattMinimalFramesProfilesDB.activeProfile
+    if type(currentActive) ~= "string" or currentActive == "" then
+        currentActive = "Default"
+    end
+
     local characterKey = GetCurrentCharacterKey()
     if type(characterKey) ~= "string" or characterKey == "" then
-        MattMinimalFramesProfilesDB.activeProfile = "Default"
+        if type(MattMinimalFramesProfilesDB.profiles[currentActive]) == "table" then
+            MattMinimalFramesProfilesDB.activeProfile = currentActive
+        else
+            MattMinimalFramesProfilesDB.activeProfile = "Default"
+        end
         return
     end
 
@@ -262,8 +271,28 @@ local function ApplyCharacterProfilePreference()
         return
     end
 
-    MattMinimalFramesProfilesDB.activeProfile = "Default"
-    MattMinimalFramesProfilesDB.characterProfiles[characterKey] = "Default"
+    -- Backward compatibility: older installs may store character mappings by
+    -- short name only (e.g. "Nilm") while newer APIs resolve "Nilm-Realm".
+    local shortName = UnitName and UnitName("player")
+    if type(shortName) == "string" and shortName ~= "" then
+        local shortMappedProfile = MattMinimalFramesProfilesDB.characterProfiles[shortName]
+        if type(shortMappedProfile) == "string"
+            and shortMappedProfile ~= ""
+            and type(MattMinimalFramesProfilesDB.profiles[shortMappedProfile]) == "table"
+        then
+            MattMinimalFramesProfilesDB.activeProfile = shortMappedProfile
+            MattMinimalFramesProfilesDB.characterProfiles[characterKey] = shortMappedProfile
+            return
+        end
+    end
+
+    if type(MattMinimalFramesProfilesDB.profiles[currentActive]) == "table" then
+        MattMinimalFramesProfilesDB.activeProfile = currentActive
+        MattMinimalFramesProfilesDB.characterProfiles[characterKey] = currentActive
+    else
+        MattMinimalFramesProfilesDB.activeProfile = "Default"
+        MattMinimalFramesProfilesDB.characterProfiles[characterKey] = "Default"
+    end
 end
 
 local function EnsureProfilesRoot()
@@ -393,8 +422,8 @@ end
 
 function MMF_Profiles_Initialize()
     EnsureProfilesRoot()
-    MigrateLegacyDBIntoDefault()
     SanitizeProfilesMap()
+    MigrateLegacyDBIntoDefault()
     EnsureProfile("Default")
     EnsureAllProfiles()
     ResolveAndBindCharacterProfile()
@@ -402,7 +431,6 @@ end
 
 function MMF_NormalizeActiveProfile()
     EnsureProfilesRoot()
-    MigrateLegacyDBIntoDefault()
     SanitizeProfilesMap()
     EnsureProfile("Default")
     EnsureAllProfiles()
@@ -411,7 +439,6 @@ end
 
 function MMF_ResolveCharacterProfile(applyLive)
     EnsureProfilesRoot()
-    MigrateLegacyDBIntoDefault()
     SanitizeProfilesMap()
     EnsureProfile("Default")
     EnsureAllProfiles()
