@@ -1141,9 +1141,15 @@ end
 
 local function UpdateAuraIcon(auraFrame, auraData, filter, unit, index)
     local auraInstanceID = auraData and auraData.auraInstanceID or nil
-    local auraIcon = (auraData and auraData.icon) or "Interface\\Icons\\INV_Misc_QuestionMark"
+    local auraIcon = auraData and auraData.icon or nil
     local auraIndex = (auraData and auraData._index) or index
-    local auraSpellID = NotSecretValue(auraData and auraData.spellId) and auraData.spellId or nil
+    local auraSpellID = auraData and auraData.spellId or nil
+    if not auraIcon and auraSpellID and type(GetSpellTexture) == "function" then
+        auraIcon = GetSpellTexture(auraSpellID)
+    end
+    if not auraIcon then
+        auraIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
 
     auraFrame.icon:SetTexture(auraIcon)
     auraFrame.auraData = auraData
@@ -1293,10 +1299,9 @@ local function IsAuraRenderable(auraData)
     if type(auraData) ~= "table" then
         return false
     end
-    return NotSecretValue(auraData.name)
-        and NotSecretValue(auraData.icon)
-        and auraData.name ~= nil
-        and auraData.icon ~= nil
+    return auraData.icon ~= nil
+        or auraData.spellId ~= nil
+        or auraData.name ~= nil
 end
 
 local function GetRetailPlayerDebuffs(unit)
@@ -1329,6 +1334,94 @@ local function GetRetailPlayerDebuffs(unit)
     end
 
     return fallback
+end
+
+local function GetRetailTargetDebuffs(unit)
+    local debuffs = {}
+    local harmfulFilter = "HARMFUL|INCLUDE_NAME_PLATE_ONLY"
+    if AuraUtil and AuraUtil.CreateFilterString and AuraUtil.AuraFilters then
+        harmfulFilter = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Harmful, AuraUtil.AuraFilters.IncludeNameplateOnly)
+    end
+
+    if AuraUtil and AuraUtil.ForEachAura then
+        AuraUtil.ForEachAura(unit, harmfulFilter, 40, function(aura)
+            if type(aura) ~= "table" or aura.icon == nil then
+                return false
+            end
+            debuffs[#debuffs + 1] = {
+                name = aura.name,
+                icon = aura.icon,
+                count = aura.applications or aura.count,
+                applications = aura.applications or aura.count,
+                debuffType = aura.dispelName or aura.debuffType,
+                duration = aura.duration,
+                expirationTime = aura.expirationTime,
+                source = aura.sourceUnit or aura.source or aura.caster,
+                sourceUnit = aura.sourceUnit or aura.source or aura.caster,
+                spellId = aura.spellId,
+                auraInstanceID = aura.auraInstanceID,
+                isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
+                isFromPlayerOrPet = aura.isFromPlayerOrPet,
+                castByPlayer = aura.castByPlayer,
+                isPlayerAura = aura.isPlayerAura,
+                _index = #debuffs + 1,
+            }
+            return #debuffs >= 40
+        end, true)
+    end
+
+    if #debuffs == 0 and C_UnitAuras and C_UnitAuras.GetAuraDataByIndex then
+        for i = 1, 40 do
+            local aura = C_UnitAuras.GetAuraDataByIndex(unit, i, harmfulFilter)
+            if not aura then
+                break
+            end
+            if aura.icon ~= nil then
+                debuffs[#debuffs + 1] = {
+                    name = aura.name,
+                    icon = aura.icon,
+                    count = aura.applications or aura.count,
+                    applications = aura.applications or aura.count,
+                    debuffType = aura.dispelName or aura.debuffType,
+                    duration = aura.duration,
+                    expirationTime = aura.expirationTime,
+                    source = aura.sourceUnit or aura.source or aura.caster,
+                    sourceUnit = aura.sourceUnit or aura.source or aura.caster,
+                    spellId = aura.spellId,
+                    auraInstanceID = aura.auraInstanceID,
+                    isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
+                    isFromPlayerOrPet = aura.isFromPlayerOrPet,
+                    castByPlayer = aura.castByPlayer,
+                    isPlayerAura = aura.isPlayerAura,
+                    _index = i,
+                }
+            end
+        end
+    end
+
+    if #debuffs == 0 and type(UnitDebuff) == "function" then
+        for i = 1, 40 do
+            local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
+            if not name then
+                break
+            end
+            debuffs[#debuffs + 1] = {
+                name = name,
+                icon = icon,
+                count = count,
+                applications = count,
+                debuffType = debuffType,
+                duration = duration,
+                expirationTime = expirationTime,
+                source = source,
+                sourceUnit = source,
+                spellId = spellId,
+                _index = i,
+            }
+        end
+    end
+
+    return debuffs
 end
 
 local function UpdateUnitAuras(unit)
@@ -1386,12 +1479,9 @@ local function UpdateUnitAuras(unit)
         return
     end
 
-    local currentGUID = (type(UnitGUID) == "function") and UnitGUID(unit) or nil
-    if frame.mmfAuraUnitGUID ~= currentGUID then
-        frame.mmfAuraUnitGUID = currentGUID
-        ClearAuraContainer(frame.BuffContainer)
-        ClearAuraContainer(frame.DebuffContainer)
-    end
+    -- Do not compare/cache UnitGUID here: it can become a secret string in combat
+    -- and trigger forbidden comparisons. Target swaps are already handled by
+    -- PLAYER_TARGET_CHANGED where containers are explicitly cleared.
 
     -- Target corpses frequently stop producing reliable aura updates.
     -- Clear immediately so stale icons never linger on dead mobs.
@@ -1405,10 +1495,37 @@ local function UpdateUnitAuras(unit)
 
     local buffs = GetUnitAuras(unit, "HELPFUL")
     local debuffs = nil
+    local targetHarmfulFilter = "HARMFUL|INCLUDE_NAME_PLATE_ONLY"
+    if AuraUtil and AuraUtil.CreateFilterString and AuraUtil.AuraFilters then
+        targetHarmfulFilter = AuraUtil.CreateFilterString(AuraUtil.AuraFilters.Harmful, AuraUtil.AuraFilters.IncludeNameplateOnly)
+    end
     if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and HasRetailAuraAPI then
         debuffs = GetRetailPlayerDebuffs(unit)
+    elseif unit == "target" and HasRetailAuraAPI then
+        debuffs = GetRetailTargetDebuffs(unit)
     else
         debuffs = GetUnitAuras(unit, "HARMFUL")
+    end
+    if unit == "target" and (type(debuffs) ~= "table" or #debuffs == 0) and type(UnitDebuff) == "function" then
+        local fallbackDebuffs = {}
+        for i = 1, 40 do
+            local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
+            if not name then
+                break
+            end
+            fallbackDebuffs[#fallbackDebuffs + 1] = {
+                name = name,
+                icon = icon,
+                count = count,
+                debuffType = debuffType,
+                duration = duration,
+                expirationTime = expirationTime,
+                source = source,
+                spellId = spellId,
+                _index = i,
+            }
+        end
+        debuffs = fallbackDebuffs
     end
 
     local buffContainer = frame.BuffContainer
@@ -1449,6 +1566,8 @@ local function UpdateUnitAuras(unit)
         local debuffTooltipFilter = "HARMFUL"
         if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and HasRetailAuraAPI then
             debuffTooltipFilter = "HARMFUL|PLAYER"
+        elseif unit == "target" and HasRetailAuraAPI then
+            debuffTooltipFilter = targetHarmfulFilter
         end
         if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and not HasRetailAuraAPI then
             debuffsToDisplay = {}

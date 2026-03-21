@@ -153,8 +153,8 @@ local function IsAuraDisplayable(aura)
     if type(aura) ~= "table" then
         return false
     end
-    -- Match Blizzard 12.0.1 guard rails: skip incomplete aura payloads.
-    return aura.name ~= nil and aura.icon ~= nil
+    -- Match Blizzard 12.0.1 target-frame guard rails: only require icon.
+    return aura.icon ~= nil
 end
 
 function MMF.GetUnitAuras(unit, filter)
@@ -200,38 +200,6 @@ function MMF.GetUnitAuras(unit, filter)
     end
     
     if MMF.HasRetailAuraAPI then
-        -- Prefer legacy indexed APIs for display fidelity (icon order/tooltips).
-        -- This path avoids packed-aura edge cases and keeps index-based tooltip fallback accurate.
-        if type(UnitBuff) == "function" and type(UnitDebuff) == "function" and (filterHasHelpful or filterHasHarmful) then
-            local auraFunc = isHelpful and UnitBuff or UnitDebuff
-            local legacyFilter = filterString:find("PLAYER", 1, true) and "PLAYER" or nil
-            for i = 1, 40 do
-                local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = auraFunc(unit, i, legacyFilter)
-                if not name then
-                    break
-                end
-                local auraCopy = {
-                    name = name,
-                    icon = icon,
-                    count = count,
-                    applications = count,
-                    debuffType = debuffType,
-                    duration = duration,
-                    expirationTime = expirationTime,
-                    source = source,
-                    sourceUnit = source,
-                    spellId = spellId,
-                    isHelpful = isHelpful,
-                    isHarmful = not isHelpful,
-                    _index = i,
-                }
-                if IsAuraDisplayable(auraCopy) then
-                    InsertAuraUnique(auraCopy)
-                end
-            end
-            return auras
-        end
-
         -- Use Blizzard's slot iteration path when available.
         -- This avoids index desync edge cases and keeps aura reads stable on 12.x.
         if AuraUtil and AuraUtil.ForEachAura then
@@ -273,6 +241,36 @@ function MMF.GetUnitAuras(unit, filter)
                         end
                     end
                 until not token
+            end
+        end
+
+        -- Retail fallback: legacy indexed APIs for older edge environments.
+        if #auras == 0 and type(UnitBuff) == "function" and type(UnitDebuff) == "function" and (filterHasHelpful or filterHasHarmful) then
+            local auraFunc = isHelpful and UnitBuff or UnitDebuff
+            local legacyFilter = filterString:find("PLAYER", 1, true) and "PLAYER" or nil
+            for i = 1, 40 do
+                local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = auraFunc(unit, i, legacyFilter)
+                if not name then
+                    break
+                end
+                local auraCopy = {
+                    name = name,
+                    icon = icon,
+                    count = count,
+                    applications = count,
+                    debuffType = debuffType,
+                    duration = duration,
+                    expirationTime = expirationTime,
+                    source = source,
+                    sourceUnit = source,
+                    spellId = spellId,
+                    isHelpful = isHelpful,
+                    isHarmful = not isHelpful,
+                    _index = i,
+                }
+                if IsAuraDisplayable(auraCopy) then
+                    InsertAuraUnique(auraCopy)
+                end
             end
         end
     else
