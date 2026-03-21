@@ -108,6 +108,12 @@ MMF.HarmSpells = MMF.IsClassicEra and MMF.HarmSpells_TBC or MMF.HarmSpells_Retai
 
 MMF.HasRetailAuraAPI = (C_UnitAuras ~= nil) and not MMF.IsTBC
 
+local issecretvalue = issecretvalue
+
+local function NotSecretValue(value)
+    return not issecretvalue or not issecretvalue(value)
+end
+
 local function CloneAuraData(aura, index)
     if type(aura) ~= "table" then
         return nil
@@ -143,45 +149,136 @@ local function CloneAuraData(aura, index)
     }
 end
 
+local function IsAuraDisplayable(aura)
+    if type(aura) ~= "table" then
+        return false
+    end
+    -- Match Blizzard 12.0.1 guard rails: skip incomplete aura payloads.
+    return aura.name ~= nil and aura.icon ~= nil
+end
+
 function MMF.GetUnitAuras(unit, filter)
     local auras = {}
-    local isHelpful = (filter == "HELPFUL")
+    local filterString = type(filter) == "string" and filter or ""
+    local filterHasHelpful = filterString:find("HELPFUL", 1, true) ~= nil
+    local filterHasHarmful = filterString:find("HARMFUL", 1, true) ~= nil
+    local isHelpful = filterHasHelpful and not filterHasHarmful
+    local seenAuraInstanceIDs = {}
+    local seenSyntheticKeys = {}
+
+    local function InsertAuraUnique(auraCopy)
+        if not auraCopy then
+            return false
+        end
+
+        local auraInstanceID = auraCopy.auraInstanceID
+        if type(auraInstanceID) == "number" then
+            if seenAuraInstanceIDs[auraInstanceID] then
+                return false
+            end
+            seenAuraInstanceIDs[auraInstanceID] = true
+        else
+            local syntheticKey = table.concat({
+                tostring(auraCopy.spellId or ""),
+                tostring(auraCopy.name or ""),
+                tostring(auraCopy.icon or ""),
+                tostring(auraCopy.debuffType or ""),
+                tostring(auraCopy.isHelpful and 1 or 0),
+                tostring(auraCopy.isHarmful and 1 or 0),
+            }, "|")
+            if seenSyntheticKeys[syntheticKey] then
+                return false
+            end
+            seenSyntheticKeys[syntheticKey] = true
+        end
+
+        if type(auraCopy._index) ~= "number" then
+            auraCopy._index = #auras + 1
+        end
+        table.insert(auras, auraCopy)
+        return true
+    end
     
     if MMF.HasRetailAuraAPI then
-        local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
-        if GetAuraDataByIndex then
+        -- Prefer legacy indexed APIs for display fidelity (icon order/tooltips).
+        -- This path avoids packed-aura edge cases and keeps index-based tooltip fallback accurate.
+        if type(UnitBuff) == "function" and type(UnitDebuff) == "function" and (filterHasHelpful or filterHasHarmful) then
+            local auraFunc = isHelpful and UnitBuff or UnitDebuff
+            local legacyFilter = filterString:find("PLAYER", 1, true) and "PLAYER" or nil
             for i = 1, 40 do
-                local aura = GetAuraDataByIndex(unit, i, filter)
-                if not aura then
+                local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = auraFunc(unit, i, legacyFilter)
+                if not name then
                     break
                 end
-                local auraCopy = CloneAuraData(aura, i)
-                if auraCopy then
-                    table.insert(auras, auraCopy)
+                local auraCopy = {
+                    name = name,
+                    icon = icon,
+                    count = count,
+                    applications = count,
+                    debuffType = debuffType,
+                    duration = duration,
+                    expirationTime = expirationTime,
+                    source = source,
+                    sourceUnit = source,
+                    spellId = spellId,
+                    isHelpful = isHelpful,
+                    isHarmful = not isHelpful,
+                    _index = i,
+                }
+                if IsAuraDisplayable(auraCopy) then
+                    InsertAuraUnique(auraCopy)
                 end
             end
+            return auras
+        end
+
+        -- Use Blizzard's slot iteration path when available.
+        -- This avoids index desync edge cases and keeps aura reads stable on 12.x.
+        if AuraUtil and AuraUtil.ForEachAura then
+            local usePackedAura = true
+            AuraUtil.ForEachAura(unit, filter, 40, function(aura)
+                local auraCopy = CloneAuraData(aura, nil)
+                if auraCopy and IsAuraDisplayable(auraCopy) then
+                    InsertAuraUnique(auraCopy)
+                end
+                return #auras >= 40
+            end, usePackedAura)
         else
-            local GetAuraSlots = C_UnitAuras.GetAuraSlots
-            local GetAuraDataBySlot = C_UnitAuras.GetAuraDataBySlot
-            local token
-            repeat
-                local slots = {GetAuraSlots(unit, filter, 40, token)}
-                token = table.remove(slots, 1)
-                for _, slot in ipairs(slots) do
-                    local aura = GetAuraDataBySlot(unit, slot)
-                    if aura then
-                        local auraCopy = CloneAuraData(aura)
-                        if auraCopy then
-                            table.insert(auras, auraCopy)
-                        end
+            local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
+            if GetAuraDataByIndex then
+                for i = 1, 40 do
+                    local aura = GetAuraDataByIndex(unit, i, filter)
+                    if not aura then
+                        break
+                    end
+                    local auraCopy = CloneAuraData(aura, i)
+                    if auraCopy and IsAuraDisplayable(auraCopy) then
+                        InsertAuraUnique(auraCopy)
                     end
                 end
-            until not token
+            else
+                local GetAuraSlots = C_UnitAuras.GetAuraSlots
+                local GetAuraDataBySlot = C_UnitAuras.GetAuraDataBySlot
+                local token
+                repeat
+                    local slots = {GetAuraSlots(unit, filter, 40, token)}
+                    token = table.remove(slots, 1)
+                    for _, slot in ipairs(slots) do
+                        local aura = GetAuraDataBySlot(unit, slot)
+                        if aura then
+                            local auraCopy = CloneAuraData(aura)
+                            if auraCopy and IsAuraDisplayable(auraCopy) then
+                                InsertAuraUnique(auraCopy)
+                            end
+                        end
+                    end
+                until not token
+            end
         end
     else
         if AuraUtil and AuraUtil.ForEachAura then
-            local filterString = isHelpful and "HELPFUL" or "HARMFUL"
-            AuraUtil.ForEachAura(unit, filterString, 40, function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, _, spellId, ...)
+            local legacyAuraFilter = isHelpful and "HELPFUL" or "HARMFUL"
+            AuraUtil.ForEachAura(unit, legacyAuraFilter, 40, function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, _, spellId, ...)
                 if name then
                     table.insert(auras, {
                         name = name,
@@ -221,9 +318,10 @@ end
 function MMF.SetAuraCooldown(cooldownFrame, auraData, unit)
     if not cooldownFrame then return end
     
-    if MMF.HasRetailAuraAPI and auraData.auraInstanceID then
+    local auraInstanceID = auraData and auraData.auraInstanceID or nil
+    if MMF.HasRetailAuraAPI and auraInstanceID then
         local GetAuraDuration = C_UnitAuras.GetAuraDuration
-        local auraDuration = GetAuraDuration(unit, auraData.auraInstanceID)
+        local auraDuration = GetAuraDuration(unit, auraInstanceID)
         if auraDuration and cooldownFrame.SetCooldownFromDurationObject then
             cooldownFrame:SetCooldownFromDurationObject(auraDuration)
             return
@@ -231,8 +329,9 @@ function MMF.SetAuraCooldown(cooldownFrame, auraData, unit)
     end
     
     -- Check if duration is a secret value to avoid taint
-    local isSecretDuration = issecretvalue and issecretvalue(auraData.duration)
-    if not isSecretDuration then
+    if type(auraData) == "table"
+        and NotSecretValue(auraData.duration)
+        and NotSecretValue(auraData.expirationTime) then
         local ok, startTime, duration = pcall(function()
             if auraData.duration and auraData.duration > 0 and auraData.expirationTime then
                 return auraData.expirationTime - auraData.duration, auraData.duration
@@ -248,19 +347,23 @@ function MMF.SetAuraCooldown(cooldownFrame, auraData, unit)
 end
 
 function MMF.GetAuraCount(auraData, unit)
-    if MMF.HasRetailAuraAPI and auraData.auraInstanceID then
+    local auraInstanceID = auraData and auraData.auraInstanceID or nil
+    if MMF.HasRetailAuraAPI and auraInstanceID then
         local GetAuraApplicationDisplayCount = C_UnitAuras.GetAuraApplicationDisplayCount
         if GetAuraApplicationDisplayCount then
-            local count = GetAuraApplicationDisplayCount(unit, auraData.auraInstanceID, 2, 999)
-            if type(count) == "number" then
+            local count = GetAuraApplicationDisplayCount(unit, auraInstanceID, 2, 999)
+            if NotSecretValue(count) and type(count) == "number" then
                 return count
             end
         end
-        if auraData.applications and type(auraData.applications) == "number" then
+        if NotSecretValue(auraData and auraData.applications) and type(auraData.applications) == "number" then
             return auraData.applications
         end
     end
-    return (auraData.count and type(auraData.count) == "number" and auraData.count) or 0
+    if NotSecretValue(auraData and auraData.count) and type(auraData.count) == "number" then
+        return auraData.count
+    end
+    return 0
 end
 
 --------------------------------------------------

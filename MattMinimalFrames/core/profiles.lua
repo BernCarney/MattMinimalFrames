@@ -182,6 +182,18 @@ local PROFILE_LAYOUT_KEYS = {
     "MMF_Boss3Frame",
     "MMF_Boss4Frame",
     "MMF_Boss5Frame",
+    "playerFrameCenterX",
+    "playerFrameCenterY",
+    "targetFrameCenterX",
+    "targetFrameCenterY",
+    "totFrameCenterX",
+    "totFrameCenterY",
+    "petFrameCenterX",
+    "petFrameCenterY",
+    "focusFrameCenterX",
+    "focusFrameCenterY",
+    "bossFrameCenterX",
+    "bossFrameCenterY",
     "powerBarPositions",
     "powerTextPositions",
     "hpTextPositions",
@@ -293,17 +305,32 @@ local function SanitizeCharacterProfilesMap()
     end
 end
 
-local function MigrateLegacyDBIntoDefault()
-    local hasProfiles = false
-    for _ in pairs(MattMinimalFramesProfilesDB.profiles) do
-        hasProfiles = true
-        break
+local function ProfileHasMeaningfulData(profile)
+    if type(profile) ~= "table" then
+        return false
     end
-    if hasProfiles then return end
+    for key, value in pairs(profile) do
+        if key ~= "dbVersion" and value ~= nil then
+            return true
+        end
+    end
+    return false
+end
 
-    local legacy = type(MattMinimalFramesDB) == "table" and MattMinimalFramesDB or {}
-    MattMinimalFramesProfilesDB.profiles["Default"] = DeepCopy(legacy)
-    MattMinimalFramesProfilesDB.activeProfile = "Default"
+local function MigrateLegacyDBIntoDefault()
+    local legacy = type(MattMinimalFramesDB) == "table" and MattMinimalFramesDB or nil
+    if type(legacy) ~= "table" or not next(legacy) then
+        return
+    end
+
+    local defaultProfile = MattMinimalFramesProfilesDB.profiles["Default"]
+    if type(defaultProfile) ~= "table" or not ProfileHasMeaningfulData(defaultProfile) then
+        MattMinimalFramesProfilesDB.profiles["Default"] = DeepCopy(legacy)
+    end
+
+    if type(MattMinimalFramesProfilesDB.activeProfile) ~= "string" or MattMinimalFramesProfilesDB.activeProfile == "" then
+        MattMinimalFramesProfilesDB.activeProfile = "Default"
+    end
 end
 
 local function EnsureProfile(name)
@@ -366,8 +393,8 @@ end
 
 function MMF_Profiles_Initialize()
     EnsureProfilesRoot()
-    SanitizeProfilesMap()
     MigrateLegacyDBIntoDefault()
+    SanitizeProfilesMap()
     EnsureProfile("Default")
     EnsureAllProfiles()
     ResolveAndBindCharacterProfile()
@@ -375,6 +402,7 @@ end
 
 function MMF_NormalizeActiveProfile()
     EnsureProfilesRoot()
+    MigrateLegacyDBIntoDefault()
     SanitizeProfilesMap()
     EnsureProfile("Default")
     EnsureAllProfiles()
@@ -383,6 +411,7 @@ end
 
 function MMF_ResolveCharacterProfile(applyLive)
     EnsureProfilesRoot()
+    MigrateLegacyDBIntoDefault()
     SanitizeProfilesMap()
     EnsureProfile("Default")
     EnsureAllProfiles()

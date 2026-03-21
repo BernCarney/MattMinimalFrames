@@ -195,6 +195,13 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
                 valueText:SetText(string.format("%.1f", value))
             end
         end
+        if container.mmfSuppressOnValueChanged then
+            UpdateFill()
+            if container.RefreshResetVisibility then
+                container.RefreshResetVisibility()
+            end
+            return
+        end
         MattMinimalFramesDB[settingKey] = value
         UpdateFill()
         if onChange then onChange(value) end
@@ -296,6 +303,14 @@ function MMF_CreateMinimalSlider(parent, label, x, y, width, settingKey, minVal,
     container.valueText = valueText
     container.resetButton = resetButton
     container.RefreshResetVisibility = RefreshResetVisibility
+    container.MMFSetValueSilently = function(v)
+        if v == nil then
+            return
+        end
+        container.mmfSuppressOnValueChanged = true
+        slider:SetValue(v)
+        container.mmfSuppressOnValueChanged = nil
+    end
     ApplyLayout()
     RefreshResetVisibility()
     return container
