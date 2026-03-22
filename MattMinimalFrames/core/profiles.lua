@@ -123,6 +123,9 @@ local function SanitizeProfileTextSettings(profile)
         profile[key] = NormalizeToggle(profile[key])
     end
     profile.hideBossFrames = NormalizeToggle(profile.hideBossFrames)
+    profile.hideTargetOfTargetFrame = NormalizeToggle(profile.hideTargetOfTargetFrame)
+    profile.hidePetFrame = NormalizeToggle(profile.hidePetFrame)
+    profile.hideFocusFrame = NormalizeToggle(profile.hideFocusFrame)
 end
 
 local function MigrateProfile(profile)

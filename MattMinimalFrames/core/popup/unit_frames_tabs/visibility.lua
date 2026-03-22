@@ -16,7 +16,11 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
     local hideNameCheckboxY = -448
     local hpUnitDropdownY = -484
     local hideHPCheckboxY = -514
-    local hideBossCheckboxY = -548
+    local frameVisibilityTitleY = -548
+    local hideBossCheckboxY = -572
+    local hideToTCheckboxY = -596
+    local hidePetCheckboxY = -620
+    local hideFocusCheckboxY = -644
 
     local textVisibilityTitle = unitFramesCol:CreateFontString(nil, "OVERLAY")
     textVisibilityTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
@@ -254,9 +258,34 @@ function MMF_BuildUnitFramesVisibilitySection(ctx)
     MattMinimalFramesDB.__tempHideHPText = nil
     SetHideHPCheckboxFromDB()
 
-    CreateMinimalCheckbox(unitFramesCol, "Hide Boss Frames", LEFT_COL_X, hideBossCheckboxY, "hideBossFrames", false, function()
+    local function ApplyFrameVisibilityChanges()
         if MMF_UpdateCombatFrameVisibility then
             MMF_UpdateCombatFrameVisibility()
         end
+        if MMF_RequestAllFramesUpdate then
+            MMF_RequestAllFramesUpdate()
+        end
+    end
+
+    local frameVisibilityTitle = unitFramesCol:CreateFontString(nil, "OVERLAY")
+    frameVisibilityTitle:SetFont("Interface\\AddOns\\MattMinimalFrames\\Fonts\\Naowh.ttf", 12, "")
+    frameVisibilityTitle:SetPoint("TOPLEFT", LEFT_COL_X, frameVisibilityTitleY)
+    frameVisibilityTitle:SetTextColor(MMF_GetPopupSectionTitleColor())
+    frameVisibilityTitle:SetText("FRAME VISIBILITY")
+
+    CreateMinimalCheckbox(unitFramesCol, "Hide Boss Frames", LEFT_COL_X, hideBossCheckboxY, "hideBossFrames", false, function()
+        ApplyFrameVisibilityChanges()
+    end)
+
+    CreateMinimalCheckbox(unitFramesCol, "Hide Target of Target Frame", LEFT_COL_X, hideToTCheckboxY, "hideTargetOfTargetFrame", false, function()
+        ApplyFrameVisibilityChanges()
+    end)
+
+    CreateMinimalCheckbox(unitFramesCol, "Hide Pet Frame", LEFT_COL_X, hidePetCheckboxY, "hidePetFrame", false, function()
+        ApplyFrameVisibilityChanges()
+    end)
+
+    CreateMinimalCheckbox(unitFramesCol, "Hide Focus Frame", LEFT_COL_X, hideFocusCheckboxY, "hideFocusFrame", false, function()
+        ApplyFrameVisibilityChanges()
     end)
 end

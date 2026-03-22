@@ -362,6 +362,70 @@ local function IsPreviewRevealModeActive()
         or MattMinimalFramesDB.auraTestMode == true
 end
 
+local function IsFrameManuallyHidden(unit)
+    if not MattMinimalFramesDB then
+        return false
+    end
+    if unit == "targettarget" then
+        return IsCheckedFlag(MattMinimalFramesDB.hideTargetOfTargetFrame)
+    end
+    if unit == "pet" then
+        return IsCheckedFlag(MattMinimalFramesDB.hidePetFrame)
+    end
+    if unit == "focus" then
+        return IsCheckedFlag(MattMinimalFramesDB.hideFocusFrame)
+    end
+    return false
+end
+
+local function ApplyAuxiliaryFrameVisibility()
+    if not MattMinimalFramesDB then
+        return
+    end
+
+    local revealHiddenFrames = IsPreviewRevealModeActive()
+    local trackedUnits = {
+        "targettarget",
+        "pet",
+        "focus",
+    }
+
+    for _, unit in ipairs(trackedUnits) do
+        local frame = MMF_GetFrameForUnit and MMF_GetFrameForUnit(unit)
+        if not frame then
+            if unit == "targettarget" then
+                frame = _G.MMF_TargetOfTargetFrame
+            elseif unit == "pet" then
+                frame = _G.MMF_PetFrame
+            elseif unit == "focus" then
+                frame = _G.MMF_FocusFrame
+            end
+        end
+        if frame then
+            if IsFrameManuallyHidden(unit) and not revealHiddenFrames then
+                SuspendUnitWatch(frame)
+                StopAlphaDriver(frame)
+                frame:SetAlpha(1)
+                frame.mmfSuppressCombatVisibilityOnShow = true
+                frame.mmfSkipCombatVisibilityHide = true
+                frame:Hide()
+            elseif revealHiddenFrames then
+                SuspendUnitWatch(frame)
+                StopAlphaDriver(frame)
+                frame:SetAlpha(1)
+                frame.mmfSuppressCombatVisibilityOnShow = true
+                frame:Show()
+            else
+                ResumeUnitWatch(frame)
+                if type(UnitExists) == "function" and UnitExists(unit) then
+                    frame.mmfSuppressCombatVisibilityOnShow = true
+                    frame:Show()
+                end
+            end
+        end
+    end
+end
+
 local function ApplyBossFrameVisibility()
     if not MattMinimalFramesDB then
         return
@@ -418,6 +482,7 @@ function MMF_UpdateCombatFrameVisibility()
     local targetFrame = MMF_GetFrameForUnit and MMF_GetFrameForUnit("target") or _G.MMF_TargetFrame
     local totFrame = MMF_GetFrameForUnit and MMF_GetFrameForUnit("targettarget") or _G.MMF_TargetOfTargetFrame
 
+    ApplyAuxiliaryFrameVisibility()
     ApplyBossFrameVisibility()
 
     if not playerFrame and not targetFrame and not totFrame then
@@ -440,7 +505,11 @@ function MMF_UpdateCombatFrameVisibility()
             return
         end
 
-        if IsTargetLikeUnit(unit) and frame.mmfUnitWatchSuspended and type(UnitExists) == "function" and UnitExists(unit) then
+        if IsTargetLikeUnit(unit)
+            and frame.mmfUnitWatchSuspended
+            and (not IsFrameManuallyHidden(unit))
+            and type(UnitExists) == "function"
+            and UnitExists(unit) then
             ResumeUnitWatch(frame)
         end
 
