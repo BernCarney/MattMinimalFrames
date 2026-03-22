@@ -383,6 +383,17 @@ local function ApplyAuxiliaryFrameVisibility()
         return
     end
 
+    if (type(InCombatLockdown) == "function") and InCombatLockdown() then
+        if MMF_RunAfterCombat then
+            MMF_RunAfterCombat("mmf_apply_aux_frame_visibility", function()
+                if MMF_UpdateCombatFrameVisibility then
+                    MMF_UpdateCombatFrameVisibility()
+                end
+            end)
+        end
+        return
+    end
+
     local revealHiddenFrames = IsPreviewRevealModeActive()
     local trackedUnits = {
         "targettarget",
