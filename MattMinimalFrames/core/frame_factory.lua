@@ -2554,6 +2554,29 @@ local function CreateCastBar(frame, unit)
         SetCastTimeText(nil)
         frame.castBarFrame:Hide()
     end
+
+    local function SyncCastBarFromUnitState()
+        local name, _, _, startTime, endTime, _, castID, notInterruptible = UnitCastingInfo(unit)
+        if name then
+            frame.castInfo.casting = true
+            frame.castInfo.channeling = false
+            frame.castInfo.castID = (unit == "player" and NotSecretValue(castID) and castID) or nil
+            ShowCastBar(name, notInterruptible, startTime, endTime)
+            return true
+        end
+
+        name, _, _, startTime, endTime, _, notInterruptible = UnitChannelInfo(unit)
+        if name then
+            frame.castInfo.casting = false
+            frame.castInfo.channeling = true
+            frame.castInfo.castID = nil
+            ShowCastBar(name, notInterruptible, startTime, endTime)
+            return true
+        end
+
+        HideCastBar()
+        return false
+    end
     
     -- OnUpdate: TBC uses manual timing (no SetTimerDuration/UnitCastingDuration); Retail uses SetTimerDuration
     if Compat.IsTBC then
@@ -2652,23 +2675,7 @@ local function CreateCastBar(frame, unit)
     
     eventFrame:SetScript("OnEvent", function(self, event, ...)
         if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
-            local name, _, _, startTime, endTime, _, castID, notInterruptible = UnitCastingInfo(unit)
-            if name then
-                frame.castInfo.casting = true
-                frame.castInfo.channeling = false
-                frame.castInfo.castID = (unit == "player" and NotSecretValue(castID) and castID) or nil
-                ShowCastBar(name, notInterruptible, startTime, endTime)
-                return
-            end
-            name, _, _, startTime, endTime, _, notInterruptible = UnitChannelInfo(unit)
-            if name then
-                frame.castInfo.casting = false
-                frame.castInfo.channeling = true
-                frame.castInfo.castID = nil
-                ShowCastBar(name, notInterruptible, startTime, endTime)
-                return
-            end
-            HideCastBar()
+            SyncCastBarFromUnitState()
             
         elseif event == "UNIT_SPELLCAST_START" then
             local name, _, _, startTime, endTime, _, castID, notInterruptible = UnitCastingInfo(unit)
@@ -2712,39 +2719,30 @@ local function CreateCastBar(frame, unit)
             -- For target, castID is secret - use API instead of comparing
             if unit == "target" then
                 if not UnitCastingInfo(unit) then
-                    frame.castInfo.casting = false
-                    frame.castInfo.castID = nil
-                    HideCastBar()
+                    SyncCastBarFromUnitState()
                 end
             else
                 local _, eventCastID = ...
                 if NotSecretValue(eventCastID) and NotSecretValue(frame.castInfo.castID) and eventCastID == frame.castInfo.castID then
-                    frame.castInfo.casting = false
-                    frame.castInfo.castID = nil
-                    HideCastBar()
+                    SyncCastBarFromUnitState()
                 end
             end
             
         elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
             if frame.castInfo.channeling then
-                frame.castInfo.channeling = false
-                HideCastBar()
+                SyncCastBarFromUnitState()
             end
             
         elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
             if not frame.castInfo.casting then return end
             if unit == "target" then
                 if not UnitCastingInfo(unit) then
-                    frame.castInfo.casting = false
-                    frame.castInfo.castID = nil
-                    HideCastBar()
+                    SyncCastBarFromUnitState()
                 end
             else
                 local _, eventCastID = ...
                 if NotSecretValue(eventCastID) and NotSecretValue(frame.castInfo.castID) and eventCastID == frame.castInfo.castID then
-                    frame.castInfo.casting = false
-                    frame.castInfo.castID = nil
-                    HideCastBar()
+                    SyncCastBarFromUnitState()
                 end
             end
             

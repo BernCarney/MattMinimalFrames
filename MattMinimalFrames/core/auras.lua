@@ -992,15 +992,22 @@ local function CreateAuraIcon(parent, index, isDebuff, iconSize)
     end
     aura:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
 
         local unit = self.auraUnit or "target"
         local tooltipSet = false
 
-        if self.auraInstanceID and GameTooltip.SetUnitAuraByAuraInstanceID then
-            tooltipSet = GameTooltip:SetUnitAuraByAuraInstanceID(unit, self.auraInstanceID, self.auraFilter) and true or false
-        end
-        if not tooltipSet and self.auraIndex then
-            tooltipSet = GameTooltip:SetUnitAura(unit, self.auraIndex, self.auraFilter) and true or false
+        if HasRetailAuraAPI then
+            -- Retail strict path: instance ID only (Blizzard-style identity).
+            if self.auraInstanceID and GameTooltip.SetUnitAuraByAuraInstanceID then
+                pcall(GameTooltip.SetUnitAuraByAuraInstanceID, GameTooltip, unit, self.auraInstanceID)
+                tooltipSet = (GameTooltip:NumLines() or 0) > 0
+            end
+        else
+            if self.auraIndex then
+                pcall(GameTooltip.SetUnitAura, GameTooltip, unit, self.auraIndex, self.auraFilter)
+                tooltipSet = (GameTooltip:NumLines() or 0) > 0
+            end
         end
 
         if tooltipSet then
@@ -1122,12 +1129,20 @@ end
 
 function MMF_SetupTargetAuras()
     if MMF_TargetFrame then
-        MMF_TargetFrame.BuffContainer = CreateAuraContainer(MMF_TargetFrame, false, "target")
-        MMF_TargetFrame.DebuffContainer = CreateAuraContainer(MMF_TargetFrame, true, "target")
+        if not MMF_TargetFrame.BuffContainer then
+            MMF_TargetFrame.BuffContainer = CreateAuraContainer(MMF_TargetFrame, false, "target")
+        end
+        if not MMF_TargetFrame.DebuffContainer then
+            MMF_TargetFrame.DebuffContainer = CreateAuraContainer(MMF_TargetFrame, true, "target")
+        end
     end
     if MMF_PlayerFrame then
-        MMF_PlayerFrame.BuffContainer = CreateAuraContainer(MMF_PlayerFrame, false, "player")
-        MMF_PlayerFrame.DebuffContainer = CreateAuraContainer(MMF_PlayerFrame, true, "player")
+        if not MMF_PlayerFrame.BuffContainer then
+            MMF_PlayerFrame.BuffContainer = CreateAuraContainer(MMF_PlayerFrame, false, "player")
+        end
+        if not MMF_PlayerFrame.DebuffContainer then
+            MMF_PlayerFrame.DebuffContainer = CreateAuraContainer(MMF_PlayerFrame, true, "player")
+        end
     end
 end
 
@@ -1136,9 +1151,14 @@ end
 --------------------------------------------------
 
 local function UpdateAuraIcon(auraFrame, auraData, filter, unit, index)
-    local auraInstanceID = NotSecretValue(auraData and auraData.auraInstanceID) and auraData.auraInstanceID or nil
+    if not auraFrame or type(auraData) ~= "table" or not auraData.icon then
+        ClearAuraFrameState(auraFrame)
+        return
+    end
 
-    auraFrame.icon:SetTexture(auraData.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+    local auraInstanceID = auraData and auraData.auraInstanceID or nil
+
+    auraFrame.icon:SetTexture(auraData.icon)
     auraFrame.auraData = auraData
     auraFrame.auraIndex = (auraData and auraData._index) or index
     auraFrame.auraFilter = filter
@@ -1269,36 +1289,64 @@ local function IsPlayerOwnedDebuff(auraData)
     return sourceUnit == "player" or sourceUnit == "pet" or sourceUnit == "vehicle"
 end
 
+local function CopyRetailAuraData(aura, index)
+    if type(aura) ~= "table" then
+        return nil
+    end
+
+    return {
+        -- Retail path mirrors Blizzard packed aura payload shape.
+        name = aura.name,
+        icon = aura.icon,
+        count = aura.count,
+        applications = aura.applications,
+        debuffType = aura.debuffType,
+        dispelName = aura.dispelName,
+        duration = aura.duration,
+        expirationTime = aura.expirationTime,
+        sourceUnit = aura.sourceUnit,
+        source = aura.source,
+        caster = aura.caster,
+        isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
+        isFromPlayerOrPet = aura.isFromPlayerOrPet,
+        castByPlayer = aura.castByPlayer,
+        isPlayerAura = aura.isPlayerAura,
+        spellId = aura.spellId,
+        auraInstanceID = aura.auraInstanceID,
+        _index = index,
+    }
+end
+
+local function GetRetailAurasByFilter(unit, filter)
+    local out = {}
+    if not HasRetailAuraAPI then
+        return out
+    end
+
+    if AuraUtil and AuraUtil.ForEachAura then
+        local auraIndex = 0
+        local usePackedAura = true
+        AuraUtil.ForEachAura(unit, filter, 40, function(auraData)
+            auraIndex = auraIndex + 1
+            local auraCopy = CopyRetailAuraData(auraData, auraIndex)
+            if auraCopy then
+                out[#out + 1] = auraCopy
+            end
+            return #out >= 40
+        end, usePackedAura)
+        return out
+    end
+
+    return out
+end
+
 local function GetRetailPlayerDebuffs(unit)
-    local debuffs = GetUnitAuras(unit, "HARMFUL|PLAYER")
+    local debuffs = GetRetailAurasByFilter(unit, "HARMFUL|PLAYER")
     if debuffs and #debuffs > 0 then
         return debuffs
     end
 
-    if type(UnitDebuff) ~= "function" then
-        return debuffs or {}
-    end
-
-    local fallback = {}
-    for i = 1, 40 do
-        local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i, "PLAYER")
-        if not name then
-            break
-        end
-        fallback[#fallback + 1] = {
-            name = name,
-            icon = icon,
-            count = count,
-            debuffType = debuffType,
-            duration = duration,
-            expirationTime = expirationTime,
-            source = source,
-            spellId = spellId,
-            _index = i,
-        }
-    end
-
-    return fallback
+    return debuffs or {}
 end
 
 local function UpdateUnitAuras(unit)
@@ -1355,12 +1403,12 @@ local function UpdateUnitAuras(unit)
         return
     end
 
-    local buffs = GetUnitAuras(unit, "HELPFUL")
+    local buffs = HasRetailAuraAPI and GetRetailAurasByFilter(unit, "HELPFUL") or GetUnitAuras(unit, "HELPFUL")
     local debuffs = nil
     if unit == "target" and db.onlyShowPlayerDebuffsOnTarget == true and HasRetailAuraAPI then
         debuffs = GetRetailPlayerDebuffs(unit)
     else
-        debuffs = GetUnitAuras(unit, "HARMFUL")
+        debuffs = HasRetailAuraAPI and GetRetailAurasByFilter(unit, "HARMFUL") or GetUnitAuras(unit, "HARMFUL")
     end
 
     local buffContainer = frame.BuffContainer
@@ -1440,6 +1488,35 @@ end
 --------------------------------------------------
 
 local pendingAuraResync = {}
+local pendingTargetRefreshBurst = false
+
+local function QueueTargetRefreshBurst()
+    if pendingTargetRefreshBurst then
+        return
+    end
+    if not C_Timer or type(C_Timer.After) ~= "function" then
+        return
+    end
+
+    pendingTargetRefreshBurst = true
+    local attempts = 0
+
+    local function RunPass()
+        attempts = attempts + 1
+        MMF_UpdateTargetAuras()
+        if MMF_UpdateDispelHighlights then
+            MMF_UpdateDispelHighlights()
+        end
+
+        if attempts < 4 then
+            C_Timer.After(0.10, RunPass)
+        else
+            pendingTargetRefreshBurst = false
+        end
+    end
+
+    C_Timer.After(0.02, RunPass)
+end
 
 local function QueueAuraResync(unit)
     if not C_Timer or type(C_Timer.After) ~= "function" then
@@ -1469,12 +1546,37 @@ end
 
 local auraEventFrame = CreateFrame("Frame")
 auraEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+auraEventFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
 auraEventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 auraEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 auraEventFrame:RegisterEvent("UNIT_AURA")
 auraEventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+auraEventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+auraEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 auraEventFrame:RegisterEvent("SPELLS_CHANGED")
 auraEventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
+auraEventFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.mmfAuraPollElapsed = (self.mmfAuraPollElapsed or 0) + (elapsed or 0)
+    if self.mmfAuraPollElapsed < 0.20 then
+        return
+    end
+    self.mmfAuraPollElapsed = 0
+
+    if not HasRetailAuraAPI then
+        return
+    end
+    if not ((type(InCombatLockdown) == "function") and InCombatLockdown()) then
+        return
+    end
+    if type(UnitExists) ~= "function" or not UnitExists("target") then
+        return
+    end
+
+    MMF_UpdateTargetAuras()
+    if MMF_UpdateDispelHighlights then
+        MMF_UpdateDispelHighlights()
+    end
+end)
 auraEventFrame:SetScript("OnEvent", function(self, event, unit)
     if event == "PLAYER_ENTERING_WORLD" then
         MMF_SetupTargetAuras()
@@ -1483,6 +1585,15 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         MMF_UpdatePlayerAuras()
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
+        end
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        if MMF_TargetFrame then
+            ClearAuraContainer(MMF_TargetFrame.BuffContainer)
+            ClearAuraContainer(MMF_TargetFrame.DebuffContainer)
+        end
+        if MMF_PlayerFrame then
+            ClearAuraContainer(MMF_PlayerFrame.BuffContainer)
+            ClearAuraContainer(MMF_PlayerFrame.DebuffContainer)
         end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         MMF_UpdateTargetAuras()
@@ -1510,6 +1621,15 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         end
         MMF_UpdateTargetAuras()
         MMF_UpdatePlayerAuras()
+        QueueTargetRefreshBurst()
+        QueueAuraResync("target")
+        QueueAuraResync("player")
+        if MMF_UpdateDispelHighlights then
+            MMF_UpdateDispelHighlights()
+        end
+    elseif event == "ZONE_CHANGED_NEW_AREA" or event == "GROUP_ROSTER_UPDATE" then
+        MMF_UpdateTargetAuras()
+        MMF_UpdatePlayerAuras()
         QueueAuraResync("target")
         QueueAuraResync("player")
         if MMF_UpdateDispelHighlights then
@@ -1521,3 +1641,4 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         end
     end
 end)
+

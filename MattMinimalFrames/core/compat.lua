@@ -156,12 +156,14 @@ end
 
 function MMF.GetUnitAuras(unit, filter)
     local auras = {}
-    local isHelpful = (filter == "HELPFUL")
-    
+    local filterString = (type(filter) == "string" and filter ~= "") and filter or "HELPFUL"
+    local isHelpful = filterString:find("HELPFUL", 1, true) ~= nil
+
     if MMF.HasRetailAuraAPI then
+        -- Retail: use Blizzard's packed aura path (same pattern as FrameXML).
         if AuraUtil and AuraUtil.ForEachAura then
             local usePackedAura = true
-            AuraUtil.ForEachAura(unit, filter, 40, function(aura)
+            AuraUtil.ForEachAura(unit, filterString, 40, function(aura)
                 if aura then
                     local auraCopy = CloneAuraData(aura, #auras + 1)
                     if auraCopy then
@@ -173,13 +175,11 @@ function MMF.GetUnitAuras(unit, filter)
             return auras
         end
 
-        local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
+        -- Retail hard fallback: direct C_UnitAuras indexed API only.
+        local GetAuraDataByIndex = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
         if GetAuraDataByIndex then
             for i = 1, 40 do
-                local ok, aura = pcall(GetAuraDataByIndex, unit, i, filter)
-                if not ok then
-                    break
-                end
+                local aura = GetAuraDataByIndex(unit, i, filterString)
                 if not aura then
                     break
                 end
@@ -188,65 +188,48 @@ function MMF.GetUnitAuras(unit, filter)
                     table.insert(auras, auraCopy)
                 end
             end
-        else
-            local GetAuraSlots = C_UnitAuras.GetAuraSlots
-            local GetAuraDataBySlot = C_UnitAuras.GetAuraDataBySlot
-            local token
-            repeat
-                local results = {pcall(GetAuraSlots, unit, filter, 40, token)}
-                local ok = table.remove(results, 1)
-                if ok ~= true then
-                    break
-                end
-                token = table.remove(results, 1)
-                for _, slot in ipairs(results) do
-                    local okSlot, aura = pcall(GetAuraDataBySlot, unit, slot)
-                    if not okSlot then
-                        aura = nil
-                    end
-                    if aura then
-                        local auraCopy = CloneAuraData(aura)
-                        if auraCopy then
-                            table.insert(auras, auraCopy)
-                        end
-                    end
-                end
-            until not token
         end
-    else
-        if AuraUtil and AuraUtil.ForEachAura then
-            local filterString = isHelpful and "HELPFUL" or "HARMFUL"
-            AuraUtil.ForEachAura(unit, filterString, 40, function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, _, spellId, ...)
-                if name then
-                    table.insert(auras, {
-                        name = name,
-                        icon = icon,
-                        count = count,
-                        debuffType = debuffType,
-                        duration = duration,
-                        expirationTime = expirationTime,
-                        source = source,
-                        spellId = spellId,
-                    })
-                end
-                return #auras >= 40
-            end)
-        else
-            local auraFunc = isHelpful and UnitBuff or UnitDebuff
-            for i = 1, 40 do
-                local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = auraFunc(unit, i)
-                if not name then break end
+        return auras
+    end
+
+    -- Classic/TBC path.
+    if AuraUtil and AuraUtil.ForEachAura then
+        AuraUtil.ForEachAura(unit, filterString, 40, function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, _, spellId, ...)
+            if name then
                 table.insert(auras, {
-                    name = name,
-                    icon = icon,
-                    count = count,
-                    debuffType = debuffType,
-                    duration = duration,
-                    expirationTime = expirationTime,
-                    source = source,
-                    spellId = spellId,
+                    name = SafeAuraField(name),
+                    icon = SafeAuraField(icon),
+                    count = SafeAuraField(count),
+                    debuffType = SafeAuraField(debuffType),
+                    duration = SafeAuraField(duration),
+                    expirationTime = SafeAuraField(expirationTime),
+                    source = SafeAuraField(source),
+                    spellId = SafeAuraField(spellId),
+                    _index = #auras + 1,
                 })
             end
+            return #auras >= 40
+        end)
+    else
+        local auraFunc = isHelpful and UnitBuff or UnitDebuff
+        local unitFilter = nil
+        if filterString:find("PLAYER", 1, true) then
+            unitFilter = "PLAYER"
+        end
+        for i = 1, 40 do
+            local name, icon, count, debuffType, duration, expirationTime, source, _, _, spellId = auraFunc(unit, i, unitFilter)
+            if not name then break end
+            table.insert(auras, {
+                name = SafeAuraField(name),
+                icon = SafeAuraField(icon),
+                count = SafeAuraField(count),
+                debuffType = SafeAuraField(debuffType),
+                duration = SafeAuraField(duration),
+                expirationTime = SafeAuraField(expirationTime),
+                source = SafeAuraField(source),
+                spellId = SafeAuraField(spellId),
+                _index = i,
+            })
         end
     end
     
