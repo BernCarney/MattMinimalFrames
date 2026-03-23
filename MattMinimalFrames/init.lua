@@ -83,6 +83,11 @@ local compactPartyRaidLabelHookState = {
     raidContainerLayout = false,
 }
 
+local function IsRetailClient()
+    local compat = _G.MMF_Compat
+    return type(compat) == "table" and compat.IsRetail == true
+end
+
 local function IsFontString(region)
     return region and region.GetObjectType and region:GetObjectType() == "FontString"
 end
@@ -708,6 +713,9 @@ function MMF_UpdateBlizzardPartyRaidLabels()
     if not MattMinimalFramesDB then
         return
     end
+    if IsRetailClient() then
+        return
+    end
 
     EnsurePartyRaidLabelHook()
     ApplyPartyRaidLabelVisibilityToAllFrames()
@@ -749,6 +757,9 @@ function MMF_UpdateBlizzardPartyRaidNameFonts()
     if not MattMinimalFramesDB then
         return
     end
+    if IsRetailClient() then
+        return
+    end
 
     EnsurePartyRaidNameHook()
 
@@ -765,10 +776,15 @@ function MMF_UpdateBlizzardPartyRaidNameFonts()
 end
 
 local partyRaidRefreshEventFrame = CreateFrame("Frame")
-partyRaidRefreshEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-partyRaidRefreshEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-partyRaidRefreshEventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+if not IsRetailClient() then
+    partyRaidRefreshEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    partyRaidRefreshEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    partyRaidRefreshEventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
+end
 partyRaidRefreshEventFrame:SetScript("OnEvent", function()
+    if IsRetailClient() then
+        return
+    end
     if MMF_UpdateBlizzardPartyRaidNameFonts then
         MMF_UpdateBlizzardPartyRaidNameFonts()
     end

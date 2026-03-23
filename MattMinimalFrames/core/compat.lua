@@ -18,6 +18,183 @@ MMF_IsTBC = MMF.IsTBC
 MMF_IsClassic = MMF.IsClassic
 MMF_IsClassicEra = MMF.IsClassicEra
 
+function MMF.ShouldSuspendForBlizzardEditMode()
+    if not MMF.IsRetail then
+        return false
+    end
+
+    local frame = _G.EditModeManagerFrame
+    if not frame then
+        return false
+    end
+
+    if type(frame.IsEditModeActive) == "function" then
+        local ok, active = pcall(frame.IsEditModeActive, frame)
+        if ok and active == true then
+            return true
+        end
+    end
+
+    if type(frame.IsShown) == "function" then
+        local ok, shown = pcall(frame.IsShown, frame)
+        if ok and shown == true then
+            return true
+        end
+    end
+
+    return false
+end
+
+_G.MMF_ShouldSuspendForBlizzardEditMode = MMF.ShouldSuspendForBlizzardEditMode
+
+local blizzardEditModeNoticeFrame
+
+local function EnsureFrameEditModeLabel(frame)
+    if not frame or frame.mmfBlizzardEditModeLabel then
+        return
+    end
+
+    local label = frame:CreateFontString(nil, "OVERLAY")
+    label:SetDrawLayer("OVERLAY", 7)
+    label:SetPoint("CENTER", frame, "CENTER", 0, 0)
+    label:SetJustifyH("CENTER")
+    label:SetJustifyV("MIDDLE")
+    label:SetWidth(math.max((frame.GetWidth and frame:GetWidth()) or 0, 90) - 8)
+    label:SetWordWrap(true)
+    label:SetTextColor(0.96, 0.32, 0.32, 1)
+    label:SetFontObject(GameFontNormal)
+    label:SetText("Blizzard Edit Mode: use MMF Edit Mode for this frame")
+    label:Hide()
+
+    frame.mmfBlizzardEditModeLabel = label
+end
+
+local function UpdateFrameEditModeLabelText(frame)
+    if not frame or not frame.mmfBlizzardEditModeLabel then
+        return
+    end
+
+    local width = (frame.GetWidth and frame:GetWidth()) or 0
+    local label = frame.mmfBlizzardEditModeLabel
+    label:SetWidth(math.max(width - 8, 56))
+
+    if width <= 110 then
+        label:SetText("Use MMF\nEdit Mode")
+    elseif width <= 150 then
+        label:SetText("Blizzard Edit Mode:\nUse MMF Edit Mode")
+    else
+        label:SetText("Blizzard Edit Mode: use MMF Edit Mode for this frame")
+    end
+end
+
+local function UpdateFrameEditModeLabels(isVisible)
+    if type(MMF_GetAllFrames) ~= "function" then
+        return
+    end
+
+    for _, frame in ipairs(MMF_GetAllFrames() or {}) do
+        if frame then
+            EnsureFrameEditModeLabel(frame)
+            if frame.mmfBlizzardEditModeLabel then
+                UpdateFrameEditModeLabelText(frame)
+                if isVisible then
+                    frame.mmfBlizzardEditModeLabel:Show()
+                else
+                    frame.mmfBlizzardEditModeLabel:Hide()
+                end
+            end
+        end
+    end
+end
+
+local function EnsureBlizzardEditModeNotice()
+    if not MMF.IsRetail or blizzardEditModeNoticeFrame then
+        return
+    end
+
+    local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameLevel(200)
+    frame:SetClampedToScreen(true)
+    frame:SetSize(780, 54)
+    frame:SetPoint("TOP", UIParent, "TOP", 0, -28)
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    frame:SetBackdropColor(0.10, 0.01, 0.01, 0.88)
+    frame:SetBackdropBorderColor(0.80, 0.16, 0.16, 0.95)
+    frame:Hide()
+
+    local headline = frame:CreateFontString(nil, "OVERLAY")
+    headline:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -7)
+    headline:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -14, -7)
+    headline:SetJustifyH("CENTER")
+    headline:SetJustifyV("MIDDLE")
+    headline:SetWordWrap(false)
+    headline:SetTextColor(1, 0.86, 0.18, 1)
+    if MMF_SetFontSafe then
+        MMF_SetFontSafe(headline, MMF_Config and MMF_Config.FONT_PATH or "Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
+    else
+        headline:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
+    end
+    headline:SetText("You are in Blizzard Edit Mode")
+
+    local text = frame:CreateFontString(nil, "OVERLAY")
+    text:SetPoint("TOPLEFT", headline, "BOTTOMLEFT", 0, -4)
+    text:SetPoint("TOPRIGHT", headline, "BOTTOMRIGHT", 0, -4)
+    text:SetJustifyH("CENTER")
+    text:SetJustifyV("TOP")
+    text:SetWordWrap(true)
+    text:SetTextColor(1, 0.93, 0.93, 1)
+    text:SetFontObject(GameFontNormal)
+    text:SetText("Use MMF Edit Mode for player, target, focus, and other personal frames.\nUse Blizzard Edit Mode only for party and raid frames.")
+
+    frame.headline = headline
+    frame.text = text
+    blizzardEditModeNoticeFrame = frame
+end
+
+function MMF.UpdateBlizzardEditModeNotice()
+    if not MMF.IsRetail then
+        return
+    end
+
+    EnsureBlizzardEditModeNotice()
+    if not blizzardEditModeNoticeFrame then
+        return
+    end
+
+    if MMF.ShouldSuspendForBlizzardEditMode() then
+        blizzardEditModeNoticeFrame:Show()
+        UpdateFrameEditModeLabels(true)
+    else
+        blizzardEditModeNoticeFrame:Hide()
+        UpdateFrameEditModeLabels(false)
+    end
+end
+
+do
+    local noticeDriver = CreateFrame("Frame")
+    local elapsedSinceUpdate = 0
+
+    noticeDriver:RegisterEvent("PLAYER_LOGIN")
+    noticeDriver:RegisterEvent("PLAYER_ENTERING_WORLD")
+    noticeDriver:SetScript("OnEvent", function()
+        MMF.UpdateBlizzardEditModeNotice()
+    end)
+    noticeDriver:SetScript("OnUpdate", function(_, elapsed)
+        elapsedSinceUpdate = elapsedSinceUpdate + elapsed
+        if elapsedSinceUpdate < 0.20 then
+            return
+        end
+        elapsedSinceUpdate = 0
+        MMF.UpdateBlizzardEditModeNotice()
+    end)
+end
+
 --------------------------------------------------
 -- API COMPATIBILITY
 --------------------------------------------------

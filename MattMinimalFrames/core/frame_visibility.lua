@@ -12,6 +12,10 @@ local function ClampOpacity(value)
     return math.floor((n * 100) + 0.5) / 100
 end
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 local function ClampFadeTime(value)
     local n = tonumber(value)
     if not n then
@@ -489,6 +493,9 @@ local function ApplyBossFrameVisibility()
 end
 
 function MMF_UpdateCombatFrameVisibility()
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     local playerFrame = MMF_GetFrameForUnit and MMF_GetFrameForUnit("player") or _G.MMF_PlayerFrame
     local targetFrame = MMF_GetFrameForUnit and MMF_GetFrameForUnit("target") or _G.MMF_TargetFrame
     local totFrame = MMF_GetFrameForUnit and MMF_GetFrameForUnit("targettarget") or _G.MMF_TargetOfTargetFrame

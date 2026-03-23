@@ -15,6 +15,10 @@ local InCombatLockdown = InCombatLockdown
 local GetTime = GetTime
 local Scrub = scrub
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 local playerClass = UnitClassBase("player")
 local friendSpellID = friendSpells[playerClass]
 local harmSpellID = harmSpells[playerClass]
@@ -142,6 +146,9 @@ local function Lerp(startVal, endVal, pct)
 end
 
 local function UpdateFrameRange(frame, unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if not frame then return end
     if frame.mmfOOCFadeOutActive then
         return
@@ -272,6 +279,9 @@ local function UpdateFrameRange(frame, unit)
 end
 
 local function ResetFrameAlpha(frame)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if frame then
         if frame.mmfOOCFadeOutActive then
             return
@@ -290,6 +300,9 @@ local function ResetFrameAlpha(frame)
 end
 
 local function UpdateAllFrames()
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     UpdateFrameRange(MMF_TargetFrame, "target")
 
     if NormalizeBooleanResult(SafeCall(UnitExists, "targettarget")) == true then
@@ -311,6 +324,9 @@ eventFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
 eventFrame:RegisterEvent("UNIT_TARGET")
 
 eventFrame:SetScript("OnEvent", function(_, event, unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if event == "PLAYER_LOGIN" or
        event == "SPELLS_CHANGED" then
         RefreshRangeSpellNames()
@@ -330,6 +346,9 @@ end)
 local updateThrottle = 0
 local rangeUpdater = CreateFrame("Frame")
 rangeUpdater:SetScript("OnUpdate", function(_, elapsed)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     updateThrottle = updateThrottle + elapsed
     if updateThrottle >= 0.2 then
         updateThrottle = 0

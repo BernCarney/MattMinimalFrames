@@ -2,6 +2,10 @@ local cfg = MMF_Config or {}
 local TICK_INTERVAL = cfg.UPDATE_INTERVAL or 0.1
 local FALLBACK_INTERVAL = 0.8
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 local dirtyUnits = {}
 local dirtyFrames = {}
 local hasPending = false
@@ -13,6 +17,9 @@ local function MarkPending()
 end
 
 function MMF_RequestUnitUpdate(unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if type(unit) ~= "string" or unit == "" then
         return
     end
@@ -21,6 +28,9 @@ function MMF_RequestUnitUpdate(unit)
 end
 
 function MMF_RequestFrameUpdate(frame)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if not frame then
         return
     end
@@ -29,6 +39,9 @@ function MMF_RequestFrameUpdate(frame)
 end
 
 function MMF_RequestAllFramesUpdate()
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     fullRefreshRequested = true
     MarkPending()
 end
@@ -57,6 +70,10 @@ local function UpdateAllFramesNow()
 end
 
 function MMF_FlushRequestedUpdates()
+    if ShouldSuspendForBlizzardEditMode() then
+        ClearPending()
+        return
+    end
     if not MMF_UpdateUnitFrame then
         ClearPending()
         return
@@ -83,6 +100,10 @@ function MMF_FlushRequestedUpdates()
 end
 
 local function TickDispatcher()
+    if ShouldSuspendForBlizzardEditMode() then
+        ClearPending()
+        return
+    end
     if hasPending then
         MMF_FlushRequestedUpdates()
         fallbackElapsed = 0
@@ -121,6 +142,9 @@ local dispatcherFrame = CreateFrame("Frame")
 dispatcherFrame:RegisterEvent("PLAYER_LOGIN")
 dispatcherFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 dispatcherFrame:SetScript("OnEvent", function(_, event)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if event == "PLAYER_LOGIN" then
         StartDispatcher()
         MMF_RequestAllFramesUpdate()

@@ -1,5 +1,9 @@
 local LibCustomGlow = LibStub("LibCustomGlow-1.0")
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 local function IsEditModeActive()
     return MattMinimalFramesDB and MattMinimalFramesDB.unlockFramesEditMode == true
 end
@@ -428,6 +432,9 @@ coreEventFrame:RegisterEvent("PLAYER_FLAGS_CHANGED")
 SafeRegisterEvent(coreEventFrame, "PLAYER_PVP_UPDATE")
 
 coreEventFrame:SetScript("OnEvent", function(_, event, unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if event == "PLAYER_REGEN_ENABLED" then
         if MMF_FlushCombatQueue then
             MMF_FlushCombatQueue()
@@ -534,6 +541,9 @@ end)
 
 local pvpRefreshElapsed = 0
 coreEventFrame:SetScript("OnUpdate", function(_, elapsed)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     pvpRefreshElapsed = pvpRefreshElapsed + (elapsed or 0)
     if pvpRefreshElapsed < 1.0 then
         return

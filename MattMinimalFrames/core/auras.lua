@@ -9,6 +9,10 @@ local HasRetailAuraAPI = Compat.HasRetailAuraAPI
 
 local issecretvalue = issecretvalue
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 --------------------------------------------------
 -- HELPER FUNCTIONS
 --------------------------------------------------
@@ -1350,6 +1354,9 @@ local function GetRetailPlayerDebuffs(unit)
 end
 
 local function UpdateUnitAuras(unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     local frame = (unit == "player") and MMF_PlayerFrame or MMF_TargetFrame
     if not frame or not frame.BuffContainer or not frame.DebuffContainer then return end
 
@@ -1476,10 +1483,16 @@ local function UpdateUnitAuras(unit)
 end
 
 function MMF_UpdateTargetAuras()
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     UpdateUnitAuras("target")
 end
 
 function MMF_UpdatePlayerAuras()
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     UpdateUnitAuras("player")
 end
 
@@ -1556,6 +1569,9 @@ auraEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 auraEventFrame:RegisterEvent("SPELLS_CHANGED")
 auraEventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
 auraEventFrame:SetScript("OnUpdate", function(self, elapsed)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     self.mmfAuraPollElapsed = (self.mmfAuraPollElapsed or 0) + (elapsed or 0)
     if self.mmfAuraPollElapsed < 0.20 then
         return
@@ -1578,6 +1594,9 @@ auraEventFrame:SetScript("OnUpdate", function(self, elapsed)
     end
 end)
 auraEventFrame:SetScript("OnEvent", function(self, event, unit)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if event == "PLAYER_ENTERING_WORLD" then
         MMF_SetupTargetAuras()
         MMF_UpdateBlizzardPlayerAuraVisibility()

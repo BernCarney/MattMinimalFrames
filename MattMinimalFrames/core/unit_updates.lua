@@ -2,6 +2,10 @@ local cfg = MMF_Config
 local Compat = _G.MMF_Compat
 local lastUpdate = 0
 
+local function ShouldSuspendForBlizzardEditMode()
+    return _G.MMF_ShouldSuspendForBlizzardEditMode and _G.MMF_ShouldSuspendForBlizzardEditMode() == true
+end
+
 local UnitExists = UnitExists
 local UnitHealthMax = UnitHealthMax
 local UnitHealth = UnitHealth
@@ -1210,6 +1214,9 @@ end
 --------------------------------------------------
 
 local function UpdateUnitFrame(frame)
+    if ShouldSuspendForBlizzardEditMode() then
+        return
+    end
     if not frame or not frame.unit or not frame.nameText then return end
     local unit = frame.unit
     local db = MattMinimalFramesDB or {}
