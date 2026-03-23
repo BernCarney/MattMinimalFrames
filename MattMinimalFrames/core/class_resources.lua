@@ -866,6 +866,63 @@ local function UpdateEssenceBar()
     end
 end
 
+local function ShouldShowResourceBar(prefix)
+    if not MattMinimalFramesDB then
+        return false
+    end
+
+    if prefix == "runeBar" then
+        return playerClass == "DEATHKNIGHT" and MattMinimalFramesDB.showRuneBar == true
+    elseif prefix == "holyPowerBar" then
+        return playerClass == "PALADIN" and MattMinimalFramesDB.showHolyPowerBar == true
+    elseif prefix == "comboPointBar" then
+        if not ((playerClass == "ROGUE" or playerClass == "DRUID") and MattMinimalFramesDB.showComboPointBar == true) then
+            return false
+        end
+        if playerClass == "DRUID" then
+            local _, powerToken = UnitPowerType("player")
+            return powerToken == "ENERGY"
+        end
+        return true
+    elseif prefix == "soulShardBar" then
+        return playerClass == "WARLOCK" and MattMinimalFramesDB.showSoulShardBar == true
+    elseif prefix == "chiBar" then
+        return playerClass == "MONK" and MattMinimalFramesDB.showChiBar == true
+    elseif prefix == "arcaneChargeBar" then
+        return playerClass == "MAGE" and MattMinimalFramesDB.showArcaneChargeBar == true and IsArcaneSpec()
+    elseif prefix == "essenceBar" then
+        return playerClass == "EVOKER" and MattMinimalFramesDB.showEssenceBar == true
+    end
+
+    return false
+end
+
+function MMF_RefreshClassResourceVisibility()
+    local frameByPrefix = {
+        runeBar = MMF_RuneBar,
+        holyPowerBar = MMF_HolyPowerBar,
+        comboPointBar = MMF_ComboPointBar,
+        soulShardBar = MMF_SoulShardBar,
+        chiBar = MMF_ChiBar,
+        arcaneChargeBar = MMF_ArcaneChargeBar,
+        essenceBar = MMF_EssenceBar,
+    }
+
+    for prefix, frame in pairs(frameByPrefix) do
+        if frame then
+            frame:SetShown(ShouldShowResourceBar(prefix))
+        end
+    end
+
+    if MMF_RuneBar and MMF_RuneBar:IsShown() then UpdateRuneBar() end
+    if MMF_HolyPowerBar and MMF_HolyPowerBar:IsShown() then UpdateHolyPowerBar(MMF_HolyPowerBar) end
+    if MMF_ComboPointBar and MMF_ComboPointBar:IsShown() then UpdateComboPointBar() end
+    if MMF_SoulShardBar and MMF_SoulShardBar:IsShown() then UpdateSoulShardBar() end
+    if MMF_ChiBar and MMF_ChiBar:IsShown() then UpdateChiBar() end
+    if MMF_ArcaneChargeBar and MMF_ArcaneChargeBar:IsShown() then UpdateArcaneChargeBar() end
+    if MMF_EssenceBar and MMF_EssenceBar:IsShown() then UpdateEssenceBar() end
+end
+
 --------------------------------------------------
 -- LEGACY SCALE API (COMPAT)
 --------------------------------------------------

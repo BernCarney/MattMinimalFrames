@@ -970,16 +970,9 @@ function MMF_ApplyActiveProfileLive()
 
     if MMF_InitializeClassResources then MMF_InitializeClassResources() end
     if MMF_UpdateClassBarLayoutForCurrentClass then MMF_UpdateClassBarLayoutForCurrentClass() end
+    if MMF_RefreshClassResourceVisibility then MMF_RefreshClassResourceVisibility() end
     if MMF_ApplyGlobalFont then MMF_ApplyGlobalFont() end
     if MMF_ApplyPetActionBarPosition then MMF_ApplyPetActionBarPosition() end
-
-    if _G.MMF_RuneBar then _G.MMF_RuneBar:SetShown(MattMinimalFramesDB.showRuneBar ~= false) end
-    if _G.MMF_HolyPowerBar then _G.MMF_HolyPowerBar:SetShown(MattMinimalFramesDB.showHolyPowerBar ~= false) end
-    if _G.MMF_ComboPointBar then _G.MMF_ComboPointBar:SetShown(MattMinimalFramesDB.showComboPointBar ~= false) end
-    if _G.MMF_SoulShardBar then _G.MMF_SoulShardBar:SetShown(MattMinimalFramesDB.showSoulShardBar ~= false) end
-    if _G.MMF_ChiBar then _G.MMF_ChiBar:SetShown(MattMinimalFramesDB.showChiBar ~= false) end
-    if _G.MMF_ArcaneChargeBar then _G.MMF_ArcaneChargeBar:SetShown(MattMinimalFramesDB.showArcaneChargeBar ~= false) end
-    if _G.MMF_EssenceBar then _G.MMF_EssenceBar:SetShown(MattMinimalFramesDB.showEssenceBar ~= false) end
 
     if MMF_ToggleMinimapButton then
         local hidden = MattMinimalFramesDB.minimap and MattMinimalFramesDB.minimap.hide

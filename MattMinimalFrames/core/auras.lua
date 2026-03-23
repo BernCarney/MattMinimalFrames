@@ -1439,6 +1439,34 @@ end
 -- AURA EVENTS
 --------------------------------------------------
 
+local pendingAuraResync = {}
+
+local function QueueAuraResync(unit)
+    if not C_Timer or type(C_Timer.After) ~= "function" then
+        return
+    end
+    if pendingAuraResync[unit] then
+        return
+    end
+
+    pendingAuraResync[unit] = true
+    C_Timer.After(0.12, function()
+        pendingAuraResync[unit] = nil
+        if unit == "target" then
+            MMF_UpdateTargetAuras()
+            if MMF_UpdateDispelHighlights then
+                MMF_UpdateDispelHighlights()
+            end
+        elseif unit == "player" then
+            MMF_UpdateBlizzardPlayerAuraVisibility()
+            MMF_UpdatePlayerAuras()
+            if MMF_UpdateDispelHighlights then
+                MMF_UpdateDispelHighlights()
+            end
+        end
+    end)
+end
+
 local auraEventFrame = CreateFrame("Frame")
 auraEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 auraEventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -1467,12 +1495,14 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end
+        QueueAuraResync("target")
     elseif event == "UNIT_AURA" and unit == "player" then
         MMF_UpdateBlizzardPlayerAuraVisibility()
         MMF_UpdatePlayerAuras()
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end
+        QueueAuraResync("player")
     elseif event == "PLAYER_TARGET_CHANGED" then
         if MMF_TargetFrame then
             ClearAuraContainer(MMF_TargetFrame.BuffContainer)
@@ -1480,6 +1510,8 @@ auraEventFrame:SetScript("OnEvent", function(self, event, unit)
         end
         MMF_UpdateTargetAuras()
         MMF_UpdatePlayerAuras()
+        QueueAuraResync("target")
+        QueueAuraResync("player")
         if MMF_UpdateDispelHighlights then
             MMF_UpdateDispelHighlights()
         end

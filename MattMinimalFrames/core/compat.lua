@@ -108,6 +108,17 @@ MMF.HarmSpells = MMF.IsClassicEra and MMF.HarmSpells_TBC or MMF.HarmSpells_Retai
 
 MMF.HasRetailAuraAPI = (C_UnitAuras ~= nil) and not MMF.IsTBC
 
+local function IsSecretValue(value)
+    return issecretvalue and issecretvalue(value)
+end
+
+local function SafeAuraField(value)
+    if IsSecretValue(value) then
+        return nil
+    end
+    return value
+end
+
 local function CloneAuraData(aura, index)
     if type(aura) ~= "table" then
         return nil
@@ -116,29 +127,29 @@ local function CloneAuraData(aura, index)
     -- C_UnitAuras aura tables can be pooled/reused internally.
     -- Copy fields we rely on so each entry remains stable for the current update pass.
     return {
-        name = aura.name,
-        icon = aura.icon,
-        count = aura.count,
-        applications = aura.applications,
-        debuffType = aura.debuffType,
-        dispelName = aura.dispelName,
-        duration = aura.duration,
-        expirationTime = aura.expirationTime,
-        sourceUnit = aura.sourceUnit,
-        source = aura.source,
-        caster = aura.caster,
-        isFromPlayerOrPlayerPet = aura.isFromPlayerOrPlayerPet,
-        isFromPlayerOrPet = aura.isFromPlayerOrPet,
-        castByPlayer = aura.castByPlayer,
-        isPlayerAura = aura.isPlayerAura,
-        isStealable = aura.isStealable,
-        canApplyAura = aura.canApplyAura,
-        isBossAura = aura.isBossAura,
-        isHelpful = aura.isHelpful,
-        isHarmful = aura.isHarmful,
-        isNameplateOnly = aura.isNameplateOnly,
-        spellId = aura.spellId,
-        auraInstanceID = aura.auraInstanceID,
+        name = SafeAuraField(aura.name),
+        icon = SafeAuraField(aura.icon),
+        count = SafeAuraField(aura.count),
+        applications = SafeAuraField(aura.applications),
+        debuffType = SafeAuraField(aura.debuffType),
+        dispelName = SafeAuraField(aura.dispelName),
+        duration = SafeAuraField(aura.duration),
+        expirationTime = SafeAuraField(aura.expirationTime),
+        sourceUnit = SafeAuraField(aura.sourceUnit),
+        source = SafeAuraField(aura.source),
+        caster = SafeAuraField(aura.caster),
+        isFromPlayerOrPlayerPet = SafeAuraField(aura.isFromPlayerOrPlayerPet),
+        isFromPlayerOrPet = SafeAuraField(aura.isFromPlayerOrPet),
+        castByPlayer = SafeAuraField(aura.castByPlayer),
+        isPlayerAura = SafeAuraField(aura.isPlayerAura),
+        isStealable = SafeAuraField(aura.isStealable),
+        canApplyAura = SafeAuraField(aura.canApplyAura),
+        isBossAura = SafeAuraField(aura.isBossAura),
+        isHelpful = SafeAuraField(aura.isHelpful),
+        isHarmful = SafeAuraField(aura.isHarmful),
+        isNameplateOnly = SafeAuraField(aura.isNameplateOnly),
+        spellId = SafeAuraField(aura.spellId),
+        auraInstanceID = SafeAuraField(aura.auraInstanceID),
         _index = index or aura._index,
     }
 end
@@ -148,10 +159,27 @@ function MMF.GetUnitAuras(unit, filter)
     local isHelpful = (filter == "HELPFUL")
     
     if MMF.HasRetailAuraAPI then
+        if AuraUtil and AuraUtil.ForEachAura then
+            local usePackedAura = true
+            AuraUtil.ForEachAura(unit, filter, 40, function(aura)
+                if aura then
+                    local auraCopy = CloneAuraData(aura, #auras + 1)
+                    if auraCopy then
+                        table.insert(auras, auraCopy)
+                    end
+                end
+                return #auras >= 40
+            end, usePackedAura)
+            return auras
+        end
+
         local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
         if GetAuraDataByIndex then
             for i = 1, 40 do
-                local aura = GetAuraDataByIndex(unit, i, filter)
+                local ok, aura = pcall(GetAuraDataByIndex, unit, i, filter)
+                if not ok then
+                    break
+                end
                 if not aura then
                     break
                 end
@@ -165,10 +193,17 @@ function MMF.GetUnitAuras(unit, filter)
             local GetAuraDataBySlot = C_UnitAuras.GetAuraDataBySlot
             local token
             repeat
-                local slots = {GetAuraSlots(unit, filter, 40, token)}
-                token = table.remove(slots, 1)
-                for _, slot in ipairs(slots) do
-                    local aura = GetAuraDataBySlot(unit, slot)
+                local results = {pcall(GetAuraSlots, unit, filter, 40, token)}
+                local ok = table.remove(results, 1)
+                if ok ~= true then
+                    break
+                end
+                token = table.remove(results, 1)
+                for _, slot in ipairs(results) do
+                    local okSlot, aura = pcall(GetAuraDataBySlot, unit, slot)
+                    if not okSlot then
+                        aura = nil
+                    end
                     if aura then
                         local auraCopy = CloneAuraData(aura)
                         if auraCopy then
