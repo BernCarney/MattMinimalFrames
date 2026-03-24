@@ -111,7 +111,7 @@ function MMF_BuildUnitFramesTextSection(ctx)
     CreateMinimalCheckbox(unitFramesCol, "Name Text: NPC Reaction", LEFT_COL_X, -434, "colorNPCNameTextByReaction", false, function()
         RequestNameTextRefresh()
     end)
-    CreateMinimalCheckbox(unitFramesCol, "Name Text: Level (Player/Target)", LEFT_COL_X, -458, "showNameLevel", true, function()
+    CreateMinimalCheckbox(unitFramesCol, "Name Text: Level (Player/Target)", LEFT_COL_X, -458, "showNameLevel", false, function()
         RequestNameTextRefresh()
     end)
 
