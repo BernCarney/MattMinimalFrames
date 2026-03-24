@@ -676,6 +676,26 @@ local function ShouldShowLeaderIconForUnit(unit, db)
     return ok and isLeader == true
 end
 
+local function GetLevelSuffixForUnit(unit, db)
+    if db and db.showNameLevel == false then
+        return ""
+    end
+    if unit ~= "player" and unit ~= "target" then
+        return ""
+    end
+    if not UnitExists(unit) or not UnitLevel then
+        return ""
+    end
+    local ok, level = pcall(UnitLevel, unit)
+    if not ok or type(level) ~= "number" then
+        return ""
+    end
+    if level < 0 then
+        return " - ??"
+    end
+    return " - " .. tostring(level)
+end
+
 local function BuildNameTextWithLeaderIcon(unit, displayName, db)
     if displayName == nil then
         return ""
@@ -686,10 +706,11 @@ local function BuildNameTextWithLeaderIcon(unit, displayName, db)
     if issecretvalue and issecretvalue(displayName) then
         return displayName
     end
+    local suffix = GetLevelSuffixForUnit(unit, db)
     if not ShouldShowLeaderIconForUnit(unit, db) then
-        return displayName
+        return displayName .. suffix
     end
-    return string.format("|T%s:0|t %s", LEADER_ICON_TEXTURE, displayName)
+    return string.format("|T%s:0|t %s%s", LEADER_ICON_TEXTURE, displayName, suffix)
 end
 
 local function GetReactionColorForNameText(unit)

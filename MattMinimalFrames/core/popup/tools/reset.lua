@@ -57,6 +57,7 @@ function MMF_ResetPopupScaleAndTextToDefaults()
         MattMinimalFramesDB.showHPValueText = d.showHPValueText
         MattMinimalFramesDB.showHPPercentText = d.showHPPercentText
         MattMinimalFramesDB.hpTextUseShortValue = d.hpTextUseShortValue
+        MattMinimalFramesDB.showNameLevel = d.showNameLevel ~= false
         MattMinimalFramesDB.colorPlayerNameTextByClass = d.colorPlayerNameTextByClass == true
         MattMinimalFramesDB.colorNPCNameTextByReaction = d.colorNPCNameTextByReaction == true
         -- Power bar size

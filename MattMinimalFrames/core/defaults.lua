@@ -185,6 +185,7 @@ local mmfDefaults = {
     hpTextUseShortValue = true,
     showHPValueText = true,
     showHPPercentText = false,
+    showNameLevel = false,
     colorPlayerNameTextByClass = false,
     colorNPCNameTextByReaction = false,
     showPowerPercentText = false,

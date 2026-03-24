@@ -45,6 +45,9 @@ function MMF_BuildUnitFramesTextSection(ctx)
     if MattMinimalFramesDB.colorNPCNameTextByReaction == nil then
         MattMinimalFramesDB.colorNPCNameTextByReaction = false
     end
+    if MattMinimalFramesDB.showNameLevel == nil then
+        MattMinimalFramesDB.showNameLevel = false
+    end
 
     local hpValueCheckbox
     local hpShortValueCheckbox
@@ -106,6 +109,9 @@ function MMF_BuildUnitFramesTextSection(ctx)
         RequestNameTextRefresh()
     end)
     CreateMinimalCheckbox(unitFramesCol, "Name Text: NPC Reaction", LEFT_COL_X, -434, "colorNPCNameTextByReaction", false, function()
+        RequestNameTextRefresh()
+    end)
+    CreateMinimalCheckbox(unitFramesCol, "Name Text: Level (Player/Target)", LEFT_COL_X, -458, "showNameLevel", true, function()
         RequestNameTextRefresh()
     end)
 
