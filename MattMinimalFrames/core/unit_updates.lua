@@ -677,8 +677,14 @@ local function ShouldShowLeaderIconForUnit(unit, db)
 end
 
 local function BuildNameTextWithLeaderIcon(unit, displayName, db)
-    if type(displayName) ~= "string" or displayName == "" then
-        return displayName or ""
+    if displayName == nil then
+        return ""
+    end
+    if type(displayName) ~= "string" then
+        return ""
+    end
+    if issecretvalue and issecretvalue(displayName) then
+        return displayName
     end
     if not ShouldShowLeaderIconForUnit(unit, db) then
         return displayName
