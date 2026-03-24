@@ -713,9 +713,6 @@ function MMF_UpdateBlizzardPartyRaidLabels()
     if not MattMinimalFramesDB then
         return
     end
-    if IsRetailClient() then
-        return
-    end
 
     EnsurePartyRaidLabelHook()
     ApplyPartyRaidLabelVisibilityToAllFrames()
@@ -757,9 +754,6 @@ function MMF_UpdateBlizzardPartyRaidNameFonts()
     if not MattMinimalFramesDB then
         return
     end
-    if IsRetailClient() then
-        return
-    end
 
     EnsurePartyRaidNameHook()
 
@@ -776,15 +770,12 @@ function MMF_UpdateBlizzardPartyRaidNameFonts()
 end
 
 local partyRaidRefreshEventFrame = CreateFrame("Frame")
-if not IsRetailClient() then
-    partyRaidRefreshEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-    partyRaidRefreshEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+partyRaidRefreshEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+partyRaidRefreshEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+if IsRetailClient() then
     partyRaidRefreshEventFrame:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
 end
 partyRaidRefreshEventFrame:SetScript("OnEvent", function()
-    if IsRetailClient() then
-        return
-    end
     if MMF_UpdateBlizzardPartyRaidNameFonts then
         MMF_UpdateBlizzardPartyRaidNameFonts()
     end

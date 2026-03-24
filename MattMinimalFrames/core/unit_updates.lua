@@ -654,6 +654,38 @@ local function GetDisplayUnitName(unit, unitName)
     return truncated
 end
 
+local LEADER_ICON_TEXTURE = "Interface\\GroupFrame\\UI-Group-LeaderIcon"
+
+local function ShouldShowLeaderIconForUnit(unit, db)
+    if db.showLeaderIcons ~= true then
+        return false
+    end
+    if unit ~= "player" and unit ~= "target" then
+        return false
+    end
+    if not UnitExists(unit) then
+        return false
+    end
+    if not IsInGroup or not IsInGroup() then
+        return false
+    end
+    if not UnitIsGroupLeader then
+        return false
+    end
+    local ok, isLeader = pcall(UnitIsGroupLeader, unit)
+    return ok and isLeader == true
+end
+
+local function BuildNameTextWithLeaderIcon(unit, displayName, db)
+    if type(displayName) ~= "string" or displayName == "" then
+        return displayName or ""
+    end
+    if not ShouldShowLeaderIconForUnit(unit, db) then
+        return displayName
+    end
+    return string.format("|T%s:0|t %s", LEADER_ICON_TEXTURE, displayName)
+end
+
 local function GetReactionColorForNameText(unit)
     if UnitIsEnemy and UnitIsEnemy("player", unit) then
         return 0.8, 0.2, 0.2
@@ -1259,15 +1291,16 @@ local function UpdateUnitFrame(frame)
         frame.nameText:Show()
         local unitName = UnitName(unit)
         local displayName = GetDisplayUnitName(unit, unitName)
+        local displayNameWithLeaderIcon = BuildNameTextWithLeaderIcon(unit, displayName, db)
         local nameTextWidth = SafeGetNameTextMaxWidth(frame)
         if unit == "targettarget" then
-            frame.nameText:SetText(displayName or "")
+            frame.nameText:SetText(displayNameWithLeaderIcon or "")
             frame.nameText:SetWidth(nameTextWidth)
         else
-            frame.nameText:SetText(displayName)
+            frame.nameText:SetText(displayNameWithLeaderIcon)
             frame.nameText:SetWidth(nameTextWidth)
         end
-        ApplyAutoResizeNameText(frame, unit, displayName)
+        ApplyAutoResizeNameText(frame, unit, displayNameWithLeaderIcon)
     end
 
     local nameR, nameG, nameB = GetNameTextColor(unit, db)

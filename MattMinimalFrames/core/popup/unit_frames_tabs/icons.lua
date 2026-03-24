@@ -428,6 +428,28 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         "|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:256:256:128:192:0:64|t"
     )
 
+    local function RequestLeaderIconNameRefresh()
+        if MMF_RequestUnitUpdate then
+            MMF_RequestUnitUpdate("player")
+            MMF_RequestUnitUpdate("target")
+            return
+        end
+        if MMF_GetFrameForUnit and MMF_UpdateUnitFrame then
+            local playerFrame = MMF_GetFrameForUnit("player")
+            if playerFrame then
+                MMF_UpdateUnitFrame(playerFrame)
+            end
+            local targetFrame = MMF_GetFrameForUnit("target")
+            if targetFrame then
+                MMF_UpdateUnitFrame(targetFrame)
+            end
+        end
+    end
+
+    rightSection.leaderIconsCheck = CreateMinimalCheckbox(unitFramesCol, "Leader Icon On Names", RIGHT_COL_X, (-714 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "showLeaderIcons", false, function()
+        RequestLeaderIconNameRefresh()
+    end)
+
     local function UpdateIconAnimationControlsEnabledState()
         local hideResting = MattMinimalFramesDB and MattMinimalFramesDB.hideRestingIcon == true
         local hideCombat = MattMinimalFramesDB and MattMinimalFramesDB.hideCombatIcon == true
@@ -435,7 +457,7 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         SetCheckboxEnabled(rightSection.animatedCombatIconCheck, not hideCombat)
     end
 
-    rightSection.hideRestingIconCheck = CreateMinimalCheckbox(unitFramesCol, "Hide Resting Icon", RIGHT_COL_X, (-714 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "hideRestingIcon", false, function(checked)
+    rightSection.hideRestingIconCheck = CreateMinimalCheckbox(unitFramesCol, "Hide Resting Icon", RIGHT_COL_X, (-738 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "hideRestingIcon", false, function(checked)
         if MMF_UpdateHideRestingIconSetting then
             MMF_UpdateHideRestingIconSetting(checked)
         elseif MMF_UpdatePlayerRestingIndicator then
@@ -444,13 +466,13 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         UpdateIconAnimationControlsEnabledState()
     end)
 
-    rightSection.animatedRestingIconCheck = CreateMinimalCheckbox(unitFramesCol, "Animated Resting Icon", RIGHT_COL_X, (-738 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "animatedRestingIcon", true, function(checked)
+    rightSection.animatedRestingIconCheck = CreateMinimalCheckbox(unitFramesCol, "Animated Resting Icon", RIGHT_COL_X, (-762 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "animatedRestingIcon", true, function(checked)
         if MMF_UpdateAnimatedRestingIconSetting then
             MMF_UpdateAnimatedRestingIconSetting(checked)
         end
     end)
 
-    rightSection.hideCombatIconCheck = CreateMinimalCheckbox(unitFramesCol, "Hide Combat Icon", RIGHT_COL_X, (-762 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "hideCombatIcon", false, function(checked)
+    rightSection.hideCombatIconCheck = CreateMinimalCheckbox(unitFramesCol, "Hide Combat Icon", RIGHT_COL_X, (-786 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "hideCombatIcon", false, function(checked)
         if MMF_UpdateHideCombatIconSetting then
             MMF_UpdateHideCombatIconSetting(checked)
         elseif MMF_UpdatePlayerCombatIndicator then
@@ -459,13 +481,13 @@ function MMF_BuildUnitFramesIconsSection(ctx)
         UpdateIconAnimationControlsEnabledState()
     end)
 
-    rightSection.animatedCombatIconCheck = CreateMinimalCheckbox(unitFramesCol, "Animated Combat Icon", RIGHT_COL_X, (-786 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "animatedCombatIcon", true, function(checked)
+    rightSection.animatedCombatIconCheck = CreateMinimalCheckbox(unitFramesCol, "Animated Combat Icon", RIGHT_COL_X, (-810 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "animatedCombatIcon", true, function(checked)
         if MMF_UpdateAnimatedCombatIconSetting then
             MMF_UpdateAnimatedCombatIconSetting(checked)
         end
     end)
 
-    rightSection.combatFrameOutlineCheck = CreateMinimalCheckbox(unitFramesCol, "Combat Frame Outline", RIGHT_COL_X, (-810 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "combatFrameOutline", false, function(checked)
+    rightSection.combatFrameOutlineCheck = CreateMinimalCheckbox(unitFramesCol, "Combat Frame Outline", RIGHT_COL_X, (-834 - RIGHT_FRAME_OPTIONS_Y_SHIFT) + RIGHT_STACK_Y_OFFSET, "combatFrameOutline", false, function(checked)
         if MMF_UpdateCombatFrameOutlineSetting then
             MMF_UpdateCombatFrameOutlineSetting(checked)
         end

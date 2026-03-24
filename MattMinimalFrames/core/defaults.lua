@@ -15,6 +15,7 @@ local mmfDefaults = {
     targetFrameIconYOffset = 0,
     targetFrameIconScale = 1.0,
     showTargetMarkers = false,
+    showLeaderIcons = true,
     hideRestingIcon = false,
     hideCombatIcon = false,
     animatedRestingIcon = true,
